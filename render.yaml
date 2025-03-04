@@ -1,10 +1,19 @@
 services:
   - type: web
-    name: formular-mitarbeiter
-    buildCommand: vite build
-    publishDir: dist
-    staticPublishPath: /
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    name: scuric-dashboard-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: CLICKUP_API_KEY
+        value: pk_84132000_89QTDVSH9ZPGW3WFSS5K8604I2KGOHMO
+      - key: CORS_ORIGIN
+        value: https://dashboard-scuric.vercel.app
+    autoDeploy: true

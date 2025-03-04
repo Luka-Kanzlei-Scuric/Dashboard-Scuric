@@ -15,8 +15,9 @@ app.use(cors({
     origin: [
         'https://formular-mitarbeiter.vercel.app',
         'http://localhost:3000',
-        'http://localhost:5173'
-    ],
+        'http://localhost:5173',
+        process.env.CORS_ORIGIN || 'https://dashboard-scuric.vercel.app' // Vercel Frontend URL
+    ].filter(Boolean),
     credentials: true
 }));
 
