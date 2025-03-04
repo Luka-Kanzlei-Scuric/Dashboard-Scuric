@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: formular-mitarbeiter
+    buildCommand: vite build
+    publishDir: dist
+    staticPublishPath: /
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
