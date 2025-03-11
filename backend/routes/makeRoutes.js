@@ -166,6 +166,9 @@ function addLog(type, message, details = null, source = 'System') {
   return logEntry;
 }
 
+// Exportiere addLog-Funktion für andere Module
+module.exports.addLog = addLog;
+
 // Logs abrufen
 router.get('/logs', (req, res) => {
   res.json({ 

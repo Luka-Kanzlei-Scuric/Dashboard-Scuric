@@ -98,19 +98,110 @@ app.use('/api/forms', require('./routes/formRoutes'));
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
 
-// Direkter Debug-Endpunkt für N8N
-app.post('/api/clickup-data', (req, res) => {
+// Direkter Endpunkt für N8N Integration
+app.post('/api/clickup-data', async (req, res) => {
     console.log('N8N DIRECT API ENDPOINT REACHED');
-    console.log('Headers:', req.headers);
-    console.log('Body:', JSON.stringify(req.body, null, 2));
     
-    // Immer mit Erfolg antworten
-    res.json({
-        success: true,
-        message: 'Direkter N8N-Endpunkt erreicht',
-        received: true,
-        timestamp: new Date().toISOString()
-    });
+    try {
+        // Logs-System importieren
+        const makeRoutes = require('./routes/makeRoutes');
+        const addLog = makeRoutes.addLog;
+        
+        // Event-Daten extrahieren
+        let data = req.body;
+        console.log('Received data:', JSON.stringify(data, null, 2));
+        
+        // In Logs eintragen
+        if (typeof addLog === 'function') {
+            addLog('info', 'N8N Webhook empfangen', data, 'N8N Integration');
+        }
+
+        // Webhook-Daten extrahieren und in Form umwandeln
+        const Form = require('./models/Form');
+        let results = {
+            created: 0,
+            updated: 0,
+            failed: 0,
+            processed: 0
+        };
+        
+        // Verarbeite Webhook-Daten
+        if (Array.isArray(data) && data.length > 0) {
+            for (const item of data) {
+                try {
+                    results.processed++;
+                    
+                    // Bei Webhook-Event direkter API-Call für Task-Details
+                    if (item.task_id && (item.event === 'taskCreated' || item.event === 'taskUpdated')) {
+                        const taskId = item.task_id;
+                        
+                        // Prüfe, ob der Task bereits existiert
+                        let form = await Form.findOne({ taskId: taskId });
+                        
+                        if (form) {
+                            // Nur Datum aktualisieren
+                            form = await Form.findOneAndUpdate(
+                                { taskId: taskId },
+                                { $set: { updatedAt: new Date() } },
+                                { new: true }
+                            );
+                            results.updated++;
+                            
+                            if (typeof addLog === 'function') {
+                                addLog('success', `Task aktualisiert: ${taskId}`, {
+                                    taskId: taskId,
+                                    event: item.event
+                                }, 'N8N Webhook');
+                            }
+                        } else {
+                            // Minimalversion erstellen
+                            const newForm = new Form({
+                                taskId: taskId,
+                                leadName: 'Neuer Lead von Webhook',
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            });
+                            await newForm.save();
+                            results.created++;
+                            
+                            if (typeof addLog === 'function') {
+                                addLog('success', `Neuer Task angelegt: ${taskId}`, {
+                                    taskId: taskId,
+                                    event: item.event
+                                }, 'N8N Webhook');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Verarbeitung:', error);
+                    results.failed++;
+                    
+                    if (typeof addLog === 'function') {
+                        addLog('error', 'Fehler bei Webhook-Verarbeitung', {
+                            error: error.message,
+                            item: item
+                        }, 'N8N Webhook');
+                    }
+                }
+            }
+        }
+        
+        // Erfolgreiche Antwort senden
+        res.json({
+            success: true,
+            message: 'N8N Webhook verarbeitet',
+            results: results,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Fehler im N8N Endpoint:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Fehler bei der Verarbeitung',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Try-catch für ClickUp-Routes
