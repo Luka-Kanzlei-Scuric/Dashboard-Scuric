@@ -2,15 +2,21 @@ const express = require('express');
 const router = express.Router();
 const Form = require('../models/Form');
 
-// Empfange Rohdaten von Make.com und verarbeite sie im Backend
+// Empfange Rohdaten von Make.com oder N8N und verarbeite sie im Backend
 router.post('/clickup-sync', async (req, res) => {
   try {
     // Empfange die ClickUp-Tasks als Rohdaten
-    const tasks = req.body;
+    let tasks = req.body;
+    
+    // Unterstütze sowohl Arrays als auch einzelne Task-Objekte
+    if (!Array.isArray(tasks)) {
+      console.log('Einzelner Task empfangen, konvertiere zu Array');
+      tasks = [tasks];
+    }
     
     console.log(`Empfangene Tasks: ${tasks.length}`);
     
-    if (!Array.isArray(tasks) || tasks.length === 0) {
+    if (tasks.length === 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Keine Tasks im Request gefunden oder Daten nicht im erwarteten Format' 
@@ -64,6 +70,51 @@ router.post('/clickup-sync', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Interner Serverfehler',
+      error: error.message
+    });
+  }
+});
+
+// Debug-Route für die Fehlerbehebung
+router.post('/debug', (req, res) => {
+  console.log('Debug endpoint hit');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
+  // Respond with a success message
+  res.json({ 
+    success: true, 
+    message: 'Debug endpoint reached successfully',
+    receivedData: req.body
+  });
+});
+
+// Vereinfachte Test-Route ohne Datenbankzugriff
+router.post('/test', (req, res) => {
+  try {
+    console.log('Test endpoint hit');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // Simuliere eine Verarbeitung ohne Datenbankzugriff
+    const receivedData = req.body;
+    let processedCount = 0;
+    
+    if (Array.isArray(receivedData)) {
+      processedCount = receivedData.length;
+    } else if (receivedData && typeof receivedData === 'object') {
+      processedCount = 1;
+    }
+    
+    res.json({
+      success: true,
+      message: 'Test successful',
+      processed: processedCount,
+      receivedData: req.body
+    });
+  } catch (error) {
+    console.error('Error in test endpoint:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error in test endpoint',
       error: error.message
     });
   }

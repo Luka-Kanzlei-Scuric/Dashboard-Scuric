@@ -98,6 +98,9 @@ app.use('/api/forms', require('./routes/formRoutes'));
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
 
+// N8N-ClickUp-Route (für N8N Automation)
+app.use('/api/clickup-data', require('./routes/makeRoutes'));
+
 // Try-catch für ClickUp-Routes
 try {
     app.use('/api/clickup', require('./routes/clickupRoutes'));
