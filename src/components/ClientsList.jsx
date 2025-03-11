@@ -56,8 +56,16 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                 // Debug-Ausgabe
                 console.log("Raw data from backend:", data);
                 
+                // Extrahiere die Forms aus der Response (Backend gibt { forms: [...], pagination: {...} } zurück)
+                const formsArray = data.forms || data;
+                
+                if (!Array.isArray(formsArray)) {
+                    console.error("Received data is not an array and has no forms property:", data);
+                    throw new Error('Unexpected data format from backend');
+                }
+                
                 // Transform data for frontend display
-                const formattedData = data.map(client => ({
+                const formattedData = formsArray.map(client => ({
                     id: client.taskId || client._id,
                     name: client.leadName,
                     schulden: client.gesamtSchulden || "0",
