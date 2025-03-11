@@ -5,9 +5,20 @@ const Form = require('../models/Form');
 // Empfange Rohdaten von Make.com oder N8N und verarbeite sie im Backend
 // Hauptroute ohne Pfad für N8N
 router.post('/', async (req, res) => {
-  // Weiterleiten an /clickup-sync
-  router.handle(req, res, () => {
-    req.url = '/clickup-sync';
+  console.log('N8N Root Endpunkt erreicht');
+  console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
+  
+  // In Logs eintragen
+  addLog('info', 'N8N Anfrage erhalten', {
+    data: req.body,
+    headers: req.headers
+  }, 'N8N Integration');
+  
+  // Erfolgreiches Ergebnis zurückgeben
+  res.json({
+    success: true,
+    message: 'N8N Anfrage empfangen',
+    received: true
   });
 });
 
