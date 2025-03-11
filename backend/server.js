@@ -98,8 +98,20 @@ app.use('/api/forms', require('./routes/formRoutes'));
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
 
-// N8N-ClickUp-Route (für N8N Automation)
-app.use('/api/clickup-data', require('./routes/makeRoutes'));
+// Direkter Debug-Endpunkt für N8N
+app.post('/api/clickup-data', (req, res) => {
+    console.log('N8N DIRECT API ENDPOINT REACHED');
+    console.log('Headers:', req.headers);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    // Immer mit Erfolg antworten
+    res.json({
+        success: true,
+        message: 'Direkter N8N-Endpunkt erreicht',
+        received: true,
+        timestamp: new Date().toISOString()
+    });
+});
 
 // Try-catch für ClickUp-Routes
 try {
