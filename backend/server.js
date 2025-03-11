@@ -16,8 +16,12 @@ app.use(cors({
         'https://formular-mitarbeiter.vercel.app',
         'http://localhost:3000',
         'http://localhost:5173',
-        process.env.CORS_ORIGIN || 'https://dashboard-scuric.vercel.app' // Vercel Frontend URL
+        'http://localhost:4173', // Preview-Modus von Vite
+        process.env.CORS_ORIGIN || 'https://dashboard-scuric.vercel.app', // Vercel Frontend URL
+        '*' // Temporär alle Origins erlauben
     ].filter(Boolean),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 
@@ -97,6 +101,45 @@ app.use('/api/forms', require('./routes/formRoutes'));
 
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
+
+// Test Logs Endpoint für Frontend
+app.get('/api/test-logs', (req, res) => {
+    console.log('Test logs endpoint called');
+    const testLogs = [
+        {
+            type: 'info',
+            message: 'System gestartet',
+            source: 'Backend',
+            timestamp: new Date(),
+            details: null
+        },
+        {
+            type: 'success',
+            message: 'Datenbankverbindung hergestellt',
+            source: 'Database',
+            timestamp: new Date(),
+            details: null
+        },
+        {
+            type: 'warning',
+            message: 'Langsame Anfrage',
+            source: 'API',
+            timestamp: new Date(),
+            details: { duration: '2500ms', endpoint: '/api/test' }
+        }
+    ];
+    
+    // CORS-Header explizit setzen
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    res.json({
+        success: true,
+        logs: testLogs,
+        timestamp: new Date().toISOString()
+    });
+});
 
 // Direkter Endpunkt für N8N Integration
 app.post('/api/clickup-data', async (req, res) => {

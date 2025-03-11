@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react';
 
 const LogViewer = () => {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState([
+    // Beispiel-Log damit etwas angezeigt wird
+    {
+      type: 'info',
+      message: 'Dashboard geladen',
+      source: 'Frontend',
+      timestamp: new Date(),
+      details: null
+    }
+  ]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://privatinsolvenz-backend.onrender.com';
+  
+  // Direkte Anfrage testen
+  useEffect(() => {
+    // Test-Log im Browser hinzufügen
+    console.log(`Backend URL: ${BACKEND_URL}`);
+    
+    // Teste Direktverbindung
+    fetch(`${BACKEND_URL}/api/test-client`)
+      .then(res => res.json())
+      .then(data => console.log('Backend Test erfolgreich:', data))
+      .catch(err => console.error('Backend Test fehlgeschlagen:', err));
+  }, []);
   
   // Funktion zum manuellen Aktualisieren der Logs
   const refreshLogs = () => {
@@ -16,16 +37,41 @@ const LogViewer = () => {
     const fetchLogs = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`${BACKEND_URL}/api/make/logs`);
+        // Temporär auf test-logs umleiten
+        console.log('Fetching logs from:', `${BACKEND_URL}/api/test-logs`);
+        
+        // Explizite CORS-Konfiguration
+        const response = await fetch(`${BACKEND_URL}/api/test-logs`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors',
+          cache: 'no-cache'
+        });
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch logs');
+          const errorText = await response.text();
+          console.error('Server error response:', errorText);
+          throw new Error(`Server responded with status ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
-        setLogs(data.logs || []);
+        console.log('Logs received:', data);
+        
+        if (!data || !data.logs) {
+          console.warn('Unexpected data format, logs property missing:', data);
+          // Bei Fehler behalten wir die vorhandenen Logs bei
+        } else {
+          // Vorhandene Logs mit neuen kombinieren
+          const newLogs = [...data.logs, ...logs];
+          // Auf maximal 50 begrenzen
+          setLogs(newLogs.slice(0, 50));
+        }
       } catch (error) {
         console.error('Error fetching logs:', error);
-        setError('Failed to load logs. ' + error.message);
+        setError('Failed to load logs. ' + (error.message || 'Unknown error'));
       } finally {
         setIsLoading(false);
       }
