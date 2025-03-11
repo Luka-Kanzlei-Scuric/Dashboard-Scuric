@@ -171,10 +171,28 @@ module.exports.addLog = addLog;
 
 // Logs abrufen
 router.get('/logs', (req, res) => {
-  res.json({ 
-    success: true,
-    logs: logs 
-  });
+  // CORS-Header explizit setzen
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
+  try {
+    // Debug-Ausgabe
+    console.log(`Logs-Anfrage erhalten. Sende ${logs.length} Logs zurück.`);
+    
+    res.json({ 
+      success: true,
+      logs: logs,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Logs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      logs: []
+    });
+  }
 });
 
 // Vereinfachte Test-Route ohne Datenbankzugriff
@@ -310,5 +328,8 @@ function isQualified(status) {
   
   return qualifiedStatuses.includes(status);
 }
+
+// Exportiere transformClickUpData für andere Module
+module.exports.transformClickUpData = transformClickUpData;
 
 module.exports = router;

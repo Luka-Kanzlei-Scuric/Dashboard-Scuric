@@ -187,37 +187,82 @@ app.post('/api/clickup-data', async (req, res) => {
                         // Prüfe, ob der Task bereits existiert
                         let form = await Form.findOne({ taskId: taskId });
                         
-                        if (form) {
-                            // Nur Datum aktualisieren
-                            form = await Form.findOneAndUpdate(
-                                { taskId: taskId },
-                                { $set: { updatedAt: new Date() } },
-                                { new: true }
-                            );
-                            results.updated++;
+                        // ClickUp API-Utils importieren
+                        const clickupUtils = require('./utils/clickupUtils');
+                        
+                        try {
+                            // Vollständige Task-Details von ClickUp API abrufen
+                            const clickupTaskDetails = await clickupUtils.getTask(taskId);
+                            console.log(`Vollständige Task-Details abgerufen für ${taskId}`);
                             
-                            if (typeof addLog === 'function') {
-                                addLog('success', `Task aktualisiert: ${taskId}`, {
-                                    taskId: taskId,
-                                    event: item.event
-                                }, 'N8N Webhook');
+                            // Daten transformieren mit Helper aus makeRoutes
+                            const transformClickUpData = require('./routes/makeRoutes').transformClickUpData;
+                            
+                            if (transformClickUpData) {
+                                // Transformiere die ClickUp-Daten
+                                const transformedData = transformClickUpData(clickupTaskDetails);
+                                
+                                if (form) {
+                                    // Vorhandenes Formular mit allen Daten aktualisieren
+                                    form = await Form.findOneAndUpdate(
+                                        { taskId: taskId },
+                                        { $set: transformedData },
+                                        { new: true }
+                                    );
+                                    results.updated++;
+                                    
+                                    if (typeof addLog === 'function') {
+                                        addLog('success', `Task vollständig aktualisiert: ${taskId} (${transformedData.leadName})`, {
+                                            taskId: taskId,
+                                            event: item.event,
+                                            leadName: transformedData.leadName
+                                        }, 'N8N Webhook');
+                                    }
+                                } else {
+                                    // Vollständiges Formular erstellen
+                                    const newForm = new Form(transformedData);
+                                    await newForm.save();
+                                    results.created++;
+                                    
+                                    if (typeof addLog === 'function') {
+                                        addLog('success', `Neuer Task angelegt: ${taskId} (${transformedData.leadName})`, {
+                                            taskId: taskId,
+                                            event: item.event,
+                                            leadName: transformedData.leadName
+                                        }, 'N8N Webhook');
+                                    }
+                                }
+                            } else {
+                                throw new Error('Transformationsfunktion nicht gefunden');
                             }
-                        } else {
-                            // Minimalversion erstellen
-                            const newForm = new Form({
+                        } catch (apiError) {
+                            // Fehler beim API-Aufruf oder der Transformation
+                            console.error(`Fehler beim Abrufen/Transformieren der ClickUp-Daten: ${apiError.message}`);
+                            addLog('error', `ClickUp API-Fehler: ${apiError.message}`, {
                                 taskId: taskId,
-                                leadName: 'Neuer Lead von Webhook',
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            });
-                            await newForm.save();
-                            results.created++;
+                                error: apiError.message
+                            }, 'N8N Webhook');
                             
-                            if (typeof addLog === 'function') {
-                                addLog('success', `Neuer Task angelegt: ${taskId}`, {
+                            // Fallback: Erstelle/Aktualisiere minimale Version
+                            if (form) {
+                                // Nur Datum aktualisieren
+                                form = await Form.findOneAndUpdate(
+                                    { taskId: taskId },
+                                    { $set: { updatedAt: new Date() } },
+                                    { new: true }
+                                );
+                                results.updated++;
+                            } else {
+                                // Minimalversion erstellen
+                                const newForm = new Form({
                                     taskId: taskId,
-                                    event: item.event
-                                }, 'N8N Webhook');
+                                    leadName: 'Neuer Lead von Webhook (unvollständig)',
+                                    phase: 'erstberatung',
+                                    createdAt: new Date(),
+                                    updatedAt: new Date()
+                                });
+                                await newForm.save();
+                                results.created++;
                             }
                         }
                     }

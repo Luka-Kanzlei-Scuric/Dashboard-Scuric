@@ -57,12 +57,26 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                 console.log("Raw data from backend:", data);
                 
                 // Extrahiere die Forms aus der Response (Backend gibt { forms: [...], pagination: {...} } zurück)
-                const formsArray = data.forms || data;
+                // Verarbeite verschiedene Datenstrukturen
+                let formsArray;
+                if (data.forms) {
+                    // Form controller gibt { forms: [...] } zurück
+                    formsArray = data.forms;
+                } else if (Array.isArray(data)) {
+                    // Direct array
+                    formsArray = data;
+                } else {
+                    // Einzelnes Objekt
+                    formsArray = [data];
+                }
                 
                 if (!Array.isArray(formsArray)) {
                     console.error("Received data is not an array and has no forms property:", data);
                     throw new Error('Unexpected data format from backend');
                 }
+                
+                // Filtere ungültige Einträge
+                formsArray = formsArray.filter(item => item && item.taskId);
                 
                 // Transform data for frontend display
                 const formattedData = formsArray.map(client => ({
