@@ -3,6 +3,15 @@ const router = express.Router();
 const Form = require('../models/Form');
 
 // Empfange Rohdaten von Make.com oder N8N und verarbeite sie im Backend
+// Hauptroute ohne Pfad für N8N
+router.post('/', async (req, res) => {
+  // Weiterleiten an /clickup-sync
+  router.handle(req, res, () => {
+    req.url = '/clickup-sync';
+  });
+});
+
+// Ursprüngliche Route beibehalten für Make.com
 router.post('/clickup-sync', async (req, res) => {
   try {
     // Empfange die ClickUp-Tasks als Rohdaten
