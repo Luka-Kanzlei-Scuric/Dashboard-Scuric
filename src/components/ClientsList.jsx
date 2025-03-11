@@ -22,6 +22,23 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
         }
     }, [location.search]);
     
+    // State für Auto-Refresh
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    
+    // Auto-Refresh alle 15 Sekunden
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setRefreshTrigger(prev => prev + 1);
+        }, 15000);
+        
+        return () => clearInterval(interval);
+    }, []);
+    
+    // Manuelles Refresh-Handling
+    const refreshData = () => {
+        setRefreshTrigger(prev => prev + 1);
+    };
+    
     // Load clients from API
     useEffect(() => {
         const fetchClients = async () => {
@@ -36,6 +53,9 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                 
                 const data = await response.json();
                 
+                // Debug-Ausgabe
+                console.log("Raw data from backend:", data);
+                
                 // Transform data for frontend display
                 const formattedData = data.map(client => ({
                     id: client.taskId || client._id,
@@ -47,6 +67,9 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                     createdAt: new Date(client.createdAt),
                     updatedAt: new Date(client.updatedAt)
                 }));
+                
+                // Sortiere nach neuesten Updates
+                formattedData.sort((a, b) => b.updatedAt - a.updatedAt);
                 
                 setClients(formattedData);
                 
@@ -67,26 +90,6 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                         qualifiziert: true,
                         createdAt: new Date('2024-02-01'),
                         updatedAt: new Date('2024-02-01')
-                    },
-                    { 
-                        id: "MOCK002", 
-                        name: "Anna Schmidt", 
-                        schulden: "18000", 
-                        phase: "checkliste",
-                        phaseStatus: "Angebotszustellung",
-                        qualifiziert: true,
-                        createdAt: new Date('2024-02-05'),
-                        updatedAt: new Date('2024-02-10')
-                    },
-                    { 
-                        id: "MOCK003", 
-                        name: "Thomas Weber", 
-                        schulden: "32000", 
-                        phase: "dokumente",
-                        phaseStatus: "In Bearbeitung",
-                        qualifiziert: true,
-                        createdAt: new Date('2024-01-15'),
-                        updatedAt: new Date('2024-02-15')
                     }
                 ];
                 
@@ -97,7 +100,7 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
         };
         
         fetchClients();
-    }, []);
+    }, [refreshTrigger]);
     
     // Filter clients based on phase, search term, status, and team mode
     useEffect(() => {
@@ -233,7 +236,7 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
             
             {/* Filters */}
             <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <button 
                         className={`px-4 py-2 rounded-lg transition-colors ${!phase || phase === 'all'
                             ? 'bg-[#9c1b1c] text-white' 
@@ -241,6 +244,18 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                         onClick={() => navigate(teamMode === 'verkauf' ? '/verkauf' : '/sachbearbeitung')}
                     >
                         Alle
+                    </button>
+                    
+                    <button 
+                        className="px-4 py-2 rounded-lg transition-colors bg-[#f5e6e6] text-[#9c1b1c] hover:bg-[#f0d7d7]"
+                        onClick={refreshData}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <polyline points="23 20 23 14 17 14"></polyline>
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                        </svg>
+                        Aktualisieren
                     </button>
                     
                     {/* Only show Erstberatung and Checkliste for Verkaufsteam */}

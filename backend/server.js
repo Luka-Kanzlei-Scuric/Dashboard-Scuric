@@ -111,6 +111,12 @@ app.post('/api/clickup-data', async (req, res) => {
         let data = req.body;
         console.log('Received data:', JSON.stringify(data, null, 2));
         
+        // Korrigiere verschachtelte Daten von N8N (bei Content Type: JSON-Problem)
+        if (data && data["Content Type: JSON"]) {
+            data = [data["Content Type: JSON"]]; // In Array verpacken für Kompatibilität
+            console.log('Daten korrigiert aus Content-Type-Format');
+        }
+        
         // In Logs eintragen
         if (typeof addLog === 'function') {
             addLog('info', 'N8N Webhook empfangen', data, 'N8N Integration');
