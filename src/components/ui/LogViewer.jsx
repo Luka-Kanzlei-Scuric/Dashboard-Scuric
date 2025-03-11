@@ -4,7 +4,13 @@ const LogViewer = () => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://privatinsolvenz-backend.onrender.com';
+  
+  // Funktion zum manuellen Aktualisieren der Logs
+  const refreshLogs = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -27,11 +33,11 @@ const LogViewer = () => {
     
     fetchLogs();
     
-    // Refresh logs every 30 seconds
-    const interval = setInterval(fetchLogs, 30000);
+    // Refresh logs every 15 seconds
+    const interval = setInterval(fetchLogs, 15000);
     
     return () => clearInterval(interval);
-  }, [BACKEND_URL]);
+  }, [BACKEND_URL, refreshTrigger]);
   
   // Format date for display
   const formatDate = (dateString) => {
@@ -81,7 +87,15 @@ const LogViewer = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">System Logs</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">System Logs</h2>
+        <button 
+          onClick={refreshLogs}
+          className="px-4 py-2 bg-[#f5e6e6] text-[#9c1b1c] rounded-md hover:bg-[#f0d7d7] transition-colors"
+        >
+          Aktualisieren
+        </button>
+      </div>
       
       {logs.length === 0 ? (
         <div className="text-center py-8">

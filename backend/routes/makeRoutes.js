@@ -8,6 +8,9 @@ router.post('/clickup-sync', async (req, res) => {
     // Empfange die ClickUp-Tasks als Rohdaten
     let tasks = req.body;
     
+    // Debug-Ausgabe der eingehenden Daten
+    console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
+    
     // Unterstütze sowohl Arrays als auch einzelne Task-Objekte
     if (!Array.isArray(tasks)) {
       console.log('Einzelner Task empfangen, konvertiere zu Array');
@@ -196,10 +199,34 @@ function transformClickUpData(clickupTask) {
   // Ermittle Phase basierend auf Status
   const phase = mapStatusToPhase(clickupTask.status);
   
+  // Behandle die Daten
+  let createdAtDate = new Date();
+  let updatedAtDate = new Date();
+  
+  try {
+    if (clickupTask.date_created) {
+      createdAtDate = new Date(parseInt(clickupTask.date_created));
+    }
+  } catch (e) {
+    console.log('Fehler beim Parsen des Erstellungsdatums:', e);
+  }
+  
+  try {
+    if (clickupTask.date_updated) {
+      updatedAtDate = new Date(parseInt(clickupTask.date_updated));
+    }
+  } catch (e) {
+    console.log('Fehler beim Parsen des Aktualisierungsdatums:', e);
+  }
+  
+  // Stelle sicher, dass taskId und leadName gültige Werte haben
+  const taskId = clickupTask.id || `fallback-${Date.now()}`;
+  const leadName = clickupTask.name || 'Unbekannter Mandant';
+  
   // Erstelle das transformierte Objekt
   return {
-    taskId: clickupTask.id,
-    leadName: clickupTask.name,
+    taskId: taskId,
+    leadName: leadName,
     phase: phase,
     qualifiziert: isQualified(clickupTask.status),
     
@@ -210,22 +237,19 @@ function transformClickUpData(clickupTask) {
     wohnort: customFields['Ort'] || '',
     
     // Finanzielle Daten
-    gesamtSchulden: customFields['Gesamtschulden'] || '',
-    glaeubiger: customFields['Gläubiger Anzahl'] || '',
+    gesamtSchulden: customFields['Gesamtschulden'] || '0',
+    glaeubiger: customFields['Gläubiger Anzahl'] || '0',
     
     // Metadaten
-    createdAt: new Date(clickupTask.date_created) || new Date(),
-    updatedAt: new Date(clickupTask.date_updated) || new Date(),
+    createdAt: createdAtDate,
+    updatedAt: updatedAtDate,
     
     // ClickUp-spezifische Daten (für die Referenz)
     clickupData: {
-      status: clickupTask.status,
-      statusColor: clickupTask.status_color,
-      priority: clickupTask.priority
-    },
-    
-    // Speichere auch die Rohdaten (optional)
-    rawData: clickupTask
+      status: clickupTask.status || 'Unbekannt',
+      statusColor: clickupTask.status_color || '#cccccc',
+      priority: clickupTask.priority || 'normal'
+    }
   };
 }
 
