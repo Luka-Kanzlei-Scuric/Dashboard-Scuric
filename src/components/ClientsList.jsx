@@ -29,8 +29,34 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
             try {
                 console.log("Fetching clients from:", `${BACKEND_URL}/api/forms`);
                 
+                const response = await fetch(`${BACKEND_URL}/api/forms`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch clients');
+                }
+                
+                const data = await response.json();
+                
+                // Transform data for frontend display
+                const formattedData = data.map(client => ({
+                    id: client.taskId || client._id,
+                    name: client.leadName,
+                    schulden: client.gesamtSchulden || "0",
+                    phase: client.phase || "erstberatung",
+                    phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
+                    qualifiziert: client.qualifiziert || false,
+                    createdAt: new Date(client.createdAt),
+                    updatedAt: new Date(client.updatedAt)
+                }));
+                
+                setClients(formattedData);
+                
+                // Log the data
+                console.log(`Loaded ${formattedData.length} clients from backend`);
+            } catch (error) {
+                console.error("Error loading clients:", error);
+                
                 // Fallback to mock data for testing
-                console.log("Using mock client data");
+                console.log("Using mock client data due to error");
                 const mockData = [
                     { 
                         id: "MOCK001", 
@@ -61,32 +87,10 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                         qualifiziert: true,
                         createdAt: new Date('2024-01-15'),
                         updatedAt: new Date('2024-02-15')
-                    },
-                    { 
-                        id: "MOCK004", 
-                        name: "Laura Becker", 
-                        schulden: "15000", 
-                        phase: "erstberatung",
-                        // No phaseStatus to test the filtering
-                        qualifiziert: false,
-                        createdAt: new Date('2024-02-12'),
-                        updatedAt: new Date('2024-02-12')
-                    },
-                    { 
-                        id: "MOCK005", 
-                        name: "Michael Hoffmann", 
-                        schulden: "45000", 
-                        phase: "checkliste",
-                        phaseStatus: "Angebot unterschrieben",
-                        qualifiziert: true,
-                        createdAt: new Date('2024-01-20'),
-                        updatedAt: new Date('2024-02-08')
                     }
                 ];
                 
                 setClients(mockData);
-            } catch (error) {
-                console.error("Error loading clients:", error);
             } finally {
                 setIsLoading(false);
             }

@@ -16,7 +16,15 @@ router.post('/clickup-sync', async (req, res) => {
     
     console.log(`Empfangene Tasks: ${tasks.length}`);
     
+    // In Logs eintragen
+    addLog('info', `N8N Synchronisierung gestartet`, {
+      tasksCount: tasks.length,
+      source: 'api',
+      timestamp: new Date()
+    }, 'N8N Integration');
+    
     if (tasks.length === 0) {
+      addLog('warning', 'Leerer Request erhalten', null, 'N8N Integration');
       return res.status(400).json({ 
         success: false, 
         message: 'Keine Tasks im Request gefunden oder Daten nicht im erwarteten Format' 
@@ -48,17 +56,32 @@ router.post('/clickup-sync', async (req, res) => {
           );
           
           results.updated++;
+          addLog('success', `Mandant aktualisiert: ${transformedData.leadName}`, {
+            taskId: transformedData.taskId,
+            operation: 'update'
+          }, 'N8N Integration');
         } else {
           // Erstelle neues Formular
           const newForm = new Form(transformedData);
           await newForm.save();
           results.created++;
+          addLog('success', `Neuer Mandant erstellt: ${transformedData.leadName}`, {
+            taskId: transformedData.taskId,
+            operation: 'create'
+          }, 'N8N Integration');
         }
       } catch (error) {
         console.error(`Fehler bei Task ${task.id}:`, error);
         results.failed++;
+        addLog('error', `Fehler bei der Verarbeitung von Task ${task.id || 'unbekannt'}`, {
+          errorMessage: error.message,
+          stackTrace: error.stack
+        }, 'N8N Integration');
       }
     }
+    
+    // Erfolgreiches Ergebnis loggen
+    addLog('info', 'N8N Synchronisierung abgeschlossen', results, 'N8N Integration');
     
     res.json({
       success: true,
@@ -67,6 +90,13 @@ router.post('/clickup-sync', async (req, res) => {
     });
   } catch (error) {
     console.error('Fehler bei der Verarbeitung der Daten:', error);
+    
+    // Fehler loggen
+    addLog('error', 'Fehler bei der N8N Synchronisierung', {
+      errorMessage: error.message,
+      stackTrace: error.stack
+    }, 'N8N Integration');
+    
     res.status(500).json({ 
       success: false, 
       message: 'Interner Serverfehler',
@@ -85,6 +115,39 @@ router.post('/debug', (req, res) => {
     success: true, 
     message: 'Debug endpoint reached successfully',
     receivedData: req.body
+  });
+});
+
+// Log-System für das Dashboard
+const logs = [];
+const MAX_LOGS = 100;
+
+// Log-Funktion
+function addLog(type, message, details = null, source = 'System') {
+  const logEntry = {
+    type: type, // 'success', 'error', 'info', 'warning'
+    message,
+    details,
+    source,
+    timestamp: new Date()
+  };
+  
+  logs.unshift(logEntry); // Neue Logs am Anfang hinzufügen
+  
+  // Maximale Anzahl an Logs begrenzen
+  if (logs.length > MAX_LOGS) {
+    logs.pop();
+  }
+  
+  console.log(`[${type.toUpperCase()}] ${message}`);
+  return logEntry;
+}
+
+// Logs abrufen
+router.get('/logs', (req, res) => {
+  res.json({ 
+    success: true,
+    logs: logs 
   });
 });
 

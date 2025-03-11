@@ -158,6 +158,22 @@ const Dashboard = ({ children }) => {
                                 <span>ClickUp Import</span>
                             </button>
                         </li>
+                        <li>
+                            <button
+                                className={`w-full text-left px-4 py-3 flex items-center hover:bg-gray-100 ${location.pathname.includes('/verkauf/logs') ? 'bg-gray-200 border-l-4 border-[#9c1b1c]' : ''}`}
+                                onClick={() => navigate('/verkauf/logs')}
+                            >
+                                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5e6e6] text-[#9c1b1c] mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="17" y1="10" x2="3" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="17" y1="18" x2="3" y2="18"></line>
+                                    </svg>
+                                </span>
+                                <span>System Logs</span>
+                            </button>
+                        </li>
                     </ul>
                     
                     <div className="px-4 py-2 mt-4 text-xs text-gray-600 uppercase">Phasen</div>

@@ -7,6 +7,7 @@ import ClientsList from './components/ClientsList';
 import ChecklistePhase from './components/ChecklistePhase';
 import DokumentePhase from './components/DokumentePhase';
 import ClickUpImport from './components/ClickUpImport';
+import LogViewer from './components/ui/LogViewer';
 
 // Welcome/Home page with team selection
 const TeamSelection = () => (
@@ -96,6 +97,13 @@ function App() {
         <Route path="/verkauf/clickup-import" element={
           <Dashboard>
             <ClickUpImport />
+          </Dashboard>
+        } />
+        
+        {/* System Logs */}
+        <Route path="/verkauf/logs" element={
+          <Dashboard>
+            <LogViewer />
           </Dashboard>
         } />
 
