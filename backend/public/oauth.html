@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClickUp OAuth Integration</title>
+    <title>ClickUp Integration</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -61,18 +61,38 @@
             border-radius: 4px;
             overflow-x: auto;
         }
+        .api-key-form {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>ClickUp OAuth Integration</h1>
+        <h1>ClickUp Integration</h1>
         
-        <div id="oauth-status" class="status info">
-            Checking OAuth status...
+        <div id="connection-status" class="status info">
+            ClickUp API Connection Status: Checking...
         </div>
         
-        <div>
-            <button id="connect-btn" onclick="initiateOAuth()">Connect with ClickUp</button>
+        <div class="api-key-form">
+            <h3>API Key Configuration</h3>
+            <p>For direct API integration, enter your ClickUp API key:</p>
+            <input type="text" id="api-key" placeholder="Enter your ClickUp API key">
+            <button onclick="saveApiKey()">Save API Key</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
             <button id="test-btn" onclick="testConnection()">Test Connection</button>
         </div>
         
@@ -83,56 +103,74 @@
     </div>
 
     <script>
-        // Check OAuth status when page loads
+        // Check connection status when page loads
         window.onload = async function() {
-            await checkOAuthStatus();
+            await checkConnectionStatus();
         };
 
-        // Function to check OAuth status
-        async function checkOAuthStatus() {
+        // Function to check connection status
+        async function checkConnectionStatus() {
             try {
-                const response = await fetch('/api/clickup/oauth/status');
+                const response = await fetch('/api/clickup/test');
                 const data = await response.json();
                 
-                const statusDiv = document.getElementById('oauth-status');
+                const statusDiv = document.getElementById('connection-status');
                 
                 if (data.success) {
-                    if (data.authenticated) {
-                        statusDiv.className = 'status success';
-                        statusDiv.innerHTML = `
-                            <strong>Connected to ClickUp!</strong><br>
-                            Authentication provider: ${data.provider}<br>
-                            Expires: ${new Date(data.expires).toLocaleString()}
-                        `;
-                    } else {
-                        statusDiv.className = 'status info';
-                        statusDiv.innerHTML = `
-                            <strong>Not connected to ClickUp</strong><br>
-                            Click the "Connect with ClickUp" button to authenticate.
-                        `;
-                    }
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        <strong>Connected to ClickUp!</strong><br>
+                        User: ${data.clickupData?.user?.username || 'Unknown'}<br>
+                        Auth Method: ${data.authMethod || 'API Key'}
+                    `;
                 } else {
                     statusDiv.className = 'status error';
                     statusDiv.innerHTML = `
-                        <strong>Error checking OAuth status</strong><br>
-                        ${data.message || 'Unknown error'}
+                        <strong>Not connected to ClickUp</strong><br>
+                        ${data.message || 'Please check your API key or connection settings.'}
                     `;
                 }
             } catch (error) {
-                console.error('Error checking OAuth status:', error);
-                const statusDiv = document.getElementById('oauth-status');
+                console.error('Error checking connection status:', error);
+                const statusDiv = document.getElementById('connection-status');
                 statusDiv.className = 'status error';
                 statusDiv.innerHTML = `
-                    <strong>Error checking OAuth status</strong><br>
+                    <strong>Error checking ClickUp connection</strong><br>
                     ${error.message || 'Unknown error'}
                 `;
             }
         }
 
-        // Function to initiate OAuth flow
-        function initiateOAuth() {
-            const currentUrl = window.location.href;
-            window.location.href = `/api/clickup/oauth?redirectUrl=${encodeURIComponent(currentUrl)}`;
+        // Function to save API key
+        async function saveApiKey() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            
+            if (!apiKey) {
+                alert('Please enter a valid API key');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/clickup/config/api-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ apiKey })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('API key saved successfully!');
+                    checkConnectionStatus();
+                } else {
+                    alert(`Error saving API key: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error saving API key:', error);
+                alert(`Error saving API key: ${error.message}`);
+            }
         }
 
         // Function to test the connection
@@ -148,6 +186,9 @@
                 const data = await response.json();
                 
                 resultData.innerText = JSON.stringify(data, null, 2);
+                
+                // Update connection status
+                checkConnectionStatus();
             } catch (error) {
                 console.error('Error testing connection:', error);
                 const resultDiv = document.getElementById('connection-result');
