@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Config routes
-router.post('/config/api-key', async (req, res) => {
+router.post('/set-api-key', async (req, res) => {
   try {
     const { apiKey } = req.body;
     

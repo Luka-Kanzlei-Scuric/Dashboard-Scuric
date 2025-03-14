@@ -151,7 +151,15 @@
             }
             
             try {
-                const response = await fetch('/api/clickup/config/api-key', {
+                console.log('Saving API key...');
+                
+                // Show the connection result area with loading message
+                const resultDiv = document.getElementById('connection-result');
+                const resultData = document.getElementById('result-data');
+                resultDiv.style.display = 'block';
+                resultData.innerText = 'Saving API key...';
+                
+                const response = await fetch('/api/clickup/set-api-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -159,16 +167,40 @@
                     body: JSON.stringify({ apiKey })
                 });
                 
+                // Check if response is OK
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status} ${response.statusText}`);
+                }
+                
+                // Try to parse response as JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    resultData.innerText = `Warning: Server returned non-JSON response: ${text.substring(0, 100)}...`;
+                    return;
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
+                    resultData.innerText = 'API key saved successfully! Testing connection...';
                     alert('API key saved successfully!');
-                    checkConnectionStatus();
+                    
+                    // Test the connection with the new key
+                    await testConnection();
                 } else {
+                    resultData.innerText = `Error: ${data.message || 'Unknown error'}`;
                     alert(`Error saving API key: ${data.message}`);
                 }
             } catch (error) {
                 console.error('Error saving API key:', error);
+                
+                // Show error in result area
+                const resultDiv = document.getElementById('connection-result');
+                const resultData = document.getElementById('result-data');
+                resultDiv.style.display = 'block';
+                resultData.innerText = `Error saving API key: ${error.message}`;
+                
                 alert(`Error saving API key: ${error.message}`);
             }
         }
