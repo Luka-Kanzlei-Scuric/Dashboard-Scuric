@@ -1,7 +1,24 @@
 // controllers/oauthController.js
 const passport = require('passport');
 const clickupUtils = require('../utils/clickupUtils');
-const { addLog } = require('../routes/makeRoutes');
+
+// Safe logging function that won't crash if the real addLog isn't available
+const safeLog = (type, message, details = {}, source = 'OAuth Controller') => {
+  try {
+    // Try to use the addLog function from makeRoutes if available
+    const makeRoutes = require('../routes/makeRoutes');
+    if (typeof makeRoutes.addLog === 'function') {
+      makeRoutes.addLog(type, message, details, source);
+    } else {
+      // Fallback to console logging
+      console.log(`[${type.toUpperCase()}] [${source}] ${message}`, details);
+    }
+  } catch (error) {
+    // If anything fails, just log to console
+    console.log(`[${type.toUpperCase()}] [${source}] ${message}`, details);
+    console.error('Error using log system:', error.message);
+  }
+};
 
 // Initiate OAuth flow
 exports.initiateOAuth = (req, res, next) => {
@@ -12,10 +29,10 @@ exports.initiateOAuth = (req, res, next) => {
     req.session.redirectURL = redirectURL;
     
     // Log the initiation of OAuth
-    addLog('info', 'Initiating ClickUp OAuth flow', {
+    safeLog('info', 'Initiating ClickUp OAuth flow', {
       redirectURL,
       timestamp: new Date().toISOString()
-    }, 'OAuth Controller');
+    });
     
     // Authenticate using the clickup strategy
     passport.authenticate('clickup', {
@@ -24,10 +41,10 @@ exports.initiateOAuth = (req, res, next) => {
     })(req, res, next);
   } catch (error) {
     console.error('Error initiating OAuth flow:', error);
-    addLog('error', 'Fehler beim Initiieren des OAuth-Flows', {
+    safeLog('error', 'Fehler beim Initiieren des OAuth-Flows', {
       error: error.message,
       stack: error.stack
-    }, 'OAuth Controller');
+    });
     
     res.status(500).json({
       success: false,
@@ -42,9 +59,9 @@ exports.handleOAuthCallback = (req, res, next) => {
   passport.authenticate('clickup', { session: false }, async (err, userData) => {
     try {
       if (err) {
-        addLog('error', 'OAuth callback authentication error', {
+        safeLog('error', 'OAuth callback authentication error', {
           error: err.message
-        }, 'OAuth Controller');
+        });
         
         return res.status(500).json({
           success: false,
@@ -54,9 +71,9 @@ exports.handleOAuthCallback = (req, res, next) => {
       }
       
       if (!userData || !userData.accessToken) {
-        addLog('error', 'OAuth callback received invalid user data', {
+        safeLog('error', 'OAuth callback received invalid user data', {
           userData: userData || 'undefined'
-        }, 'OAuth Controller');
+        });
         
         return res.status(400).json({
           success: false,
@@ -71,10 +88,10 @@ exports.handleOAuthCallback = (req, res, next) => {
         (userData.expiresAt - Date.now()) / 1000 // Convert expiry to seconds
       );
       
-      addLog('success', 'OAuth authentication successful, token saved', {
+      safeLog('success', 'OAuth authentication successful, token saved', {
         tokenId: savedToken._id,
         expiresAt: savedToken.expiresAt
-      }, 'OAuth Controller');
+      });
       
       // Get redirect URL from session or use default
       const redirectURL = req.session.redirectURL || process.env.FRONTEND_URL || 'https://dashboard-scuric.vercel.app';
@@ -86,10 +103,10 @@ exports.handleOAuthCallback = (req, res, next) => {
       res.redirect(`${redirectURL}?oauth=success&provider=clickup`);
     } catch (error) {
       console.error('Error in OAuth callback:', error);
-      addLog('error', 'Error in OAuth callback handler', {
+      safeLog('error', 'Error in OAuth callback handler', {
         error: error.message,
         stack: error.stack
-      }, 'OAuth Controller');
+      });
       
       // Redirect to frontend with error indicator
       const redirectURL = req.session.redirectURL || process.env.FRONTEND_URL || 'https://dashboard-scuric.vercel.app';
@@ -138,10 +155,10 @@ exports.getOAuthStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Error checking OAuth status:', error);
-    addLog('error', 'Fehler beim Überprüfen des OAuth-Status', {
+    safeLog('error', 'Fehler beim Überprüfen des OAuth-Status', {
       error: error.message,
       stack: error.stack
-    }, 'OAuth Controller');
+    });
     
     res.status(500).json({
       success: false,
