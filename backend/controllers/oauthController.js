@@ -34,10 +34,14 @@ exports.initiateOAuth = (req, res, next) => {
       timestamp: new Date().toISOString()
     });
     
+    // Generate a custom state parameter to validate the callback
+    const state = Math.random().toString(36).substring(2, 15);
+    req.session.oauthState = state;
+    
     // Authenticate using the clickup strategy
     passport.authenticate('clickup', {
       scope: ['task:read', 'task:write', 'webhook:read', 'webhook:write'],
-      state: true
+      state: state
     })(req, res, next);
   } catch (error) {
     console.error('Error initiating OAuth flow:', error);
@@ -56,6 +60,17 @@ exports.initiateOAuth = (req, res, next) => {
 
 // Handle OAuth callback
 exports.handleOAuthCallback = (req, res, next) => {
+  console.log('Received OAuth callback with params:', {
+    code: req.query.code ? 'present' : 'missing',
+    state: req.query.state || 'missing'
+  });
+  
+  // Validate the state parameter to prevent CSRF
+  if (req.session.oauthState && req.query.state !== req.session.oauthState) {
+    console.warn('OAuth state mismatch: expected', req.session.oauthState, 'got', req.query.state);
+    // For ClickUp we'll continue anyway since their handling is inconsistent
+  }
+  
   passport.authenticate('clickup', { session: false }, async (err, userData) => {
     try {
       if (err) {

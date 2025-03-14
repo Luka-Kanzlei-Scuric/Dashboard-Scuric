@@ -184,6 +184,18 @@ app.post('/api/clickup-data', async (req, res) => {
 try {
     app.use('/api/clickup', require('./routes/clickupRoutes'));
     console.log("ClickUp-Routen erfolgreich geladen");
+    
+    // Root domain OAuth callback route for ClickUp's restrictions
+    app.get('/', (req, res, next) => {
+        // Check if this is an OAuth callback from ClickUp
+        if (req.query.code && req.query.state) {
+            console.log("Detected ClickUp OAuth callback on root URL");
+            const oauthController = require('./controllers/oauthController');
+            return oauthController.handleOAuthCallback(req, res, next);
+        }
+        // Otherwise, proceed to the normal home route
+        next();
+    });
 } catch (error) {
     console.error("Fehler beim Laden der ClickUp-Routen:", error.message);
     

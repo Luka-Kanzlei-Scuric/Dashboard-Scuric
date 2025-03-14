@@ -10,7 +10,7 @@ const configurePassport = () => {
     tokenURL: 'https://api.clickup.com/api/v2/oauth/token',
     clientID: process.env.CLICKUP_CLIENT_ID,
     clientSecret: process.env.CLICKUP_CLIENT_SECRET,
-    callbackURL: process.env.CLICKUP_CALLBACK_URL || 'dashboard-scuric.onrender.com/api/clickup/oauth/callback',
+    callbackURL: process.env.CLICKUP_CALLBACK_URL || 'dashboard-scuric.onrender.com',
     state: true
   },
   (accessToken, refreshToken, profile, done) => {
