@@ -1,0 +1,364 @@
+{
+    "id": "8698acz7t",
+    "custom_id": null,
+    "custom_item_id": 0,
+    "name": "Celine  Schäfer ",
+    "text_content": "",
+    "description": "",
+    "status": {
+        "status": "versucht zu erreichen 1",
+        "id": "sc901207893673_ucEom80L",
+        "color": "#1090e0",
+        "type": "custom",
+        "orderindex": 1
+    },
+    "orderindex": "120458272.00109360000000000000000000000000",
+    "date_created": "1741871443477",
+    "date_updated": "1741881024972",
+    "date_closed": null,
+    "date_done": null,
+    "archived": false,
+    "creator": {
+        "id": 84132000,
+        "username": "Luka Scuric",
+        "color": "",
+        "email": "justlukax@gmail.com",
+        "profilePicture": null
+    },
+    "assignees": [
+        {
+            "id": 87789397,
+            "username": "Markus Leineweber",
+            "color": "#ffa727",
+            "initials": "ML",
+            "email": "leineweber@ra-scuric.de",
+            "profilePicture": null
+        }
+    ],
+    "group_assignees": [],
+    "watchers": [
+        {
+            "id": 87789397,
+            "username": "Markus Leineweber",
+            "color": "#ffa727",
+            "initials": "ML",
+            "email": "leineweber@ra-scuric.de",
+            "profilePicture": null
+        },
+        {
+            "id": 84132000,
+            "username": "Luka Scuric",
+            "color": "",
+            "initials": "LS",
+            "email": "justlukax@gmail.com",
+            "profilePicture": null
+        }
+    ],
+    "checklists": [],
+    "tags": [
+        {
+            "name": "lead",
+            "tag_fg": "#0f9d9f",
+            "tag_bg": "#0f9d9f",
+            "creator": 84132000
+        }
+    ],
+    "parent": null,
+    "top_level_parent": null,
+    "priority": null,
+    "due_date": null,
+    "start_date": null,
+    "points": null,
+    "time_estimate": null,
+    "custom_fields": [
+        {
+            "id": "bb560401-b034-4916-8d06-2627f0ec697e",
+            "name": "Abrechnung",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1740412481192",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "6058bb4d-082f-4689-b525-64655d36e320",
+            "name": "Anzahl Kinder",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1739375099381",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "29dd9e40-e6eb-4236-b889-3e0d47692326",
+            "name": "Art der Beschäftigung",
+            "type": "short_text",
+            "type_config": {},
+            "date_created": "1739375248542",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "0f2b9a3f-5b24-4183-9cc5-c1ffd84227d0",
+            "name": "Bankguthaben",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1739375260820",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "fd5a93ee-40cb-4615-9527-c7433c1a6b6d",
+            "name": "Familienstand",
+            "type": "short_text",
+            "type_config": {},
+            "date_created": "1739375076034",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "17da8f49-bcf9-45f3-b4c6-3709b515d40b",
+            "name": "Hausnummer",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1739375230895",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "a2182ee2-e107-4940-8ecf-4fc62130058a",
+            "name": "Honorarpreis",
+            "type": "currency",
+            "type_config": {
+                "precision": 2,
+                "currency_type": "EUR"
+            },
+            "date_created": "1739461491239",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "204d2495-1c5e-4e3d-ae1e-fee49fca2c1a",
+            "name": "Lead Source",
+            "type": "drop_down",
+            "type_config": {
+                "default": 0,
+                "placeholder": null,
+                "options": [
+                    {
+                        "id": "5a6d2b41-f16f-46a7-b66f-e7e23b54b718",
+                        "name": "Search",
+                        "color": null,
+                        "orderindex": 0
+                    },
+                    {
+                        "id": "6da5c95e-0150-4de7-9207-f4f7d0e6bcfb",
+                        "name": "Content",
+                        "color": null,
+                        "orderindex": 1
+                    },
+                    {
+                        "id": "9ddba434-e718-487f-8d8c-04edfc74998b",
+                        "name": "Social Media",
+                        "color": null,
+                        "orderindex": 2
+                    },
+                    {
+                        "id": "404f70d4-4bc0-4259-9172-a1bdb9eb7754",
+                        "name": "Email Marketing",
+                        "color": null,
+                        "orderindex": 3
+                    },
+                    {
+                        "id": "ee356811-406d-4662-b2ff-4365bc78b30a",
+                        "name": "Paid Advertising",
+                        "color": null,
+                        "orderindex": 4
+                    },
+                    {
+                        "id": "ca17848c-2485-4f09-a296-991e1588612b",
+                        "name": "Event",
+                        "color": null,
+                        "orderindex": 5
+                    },
+                    {
+                        "id": "d80ff4e5-8a7e-488a-9a8c-8758a14bb77a",
+                        "name": "Referral",
+                        "color": null,
+                        "orderindex": 6
+                    }
+                ]
+            },
+            "date_created": "1737997974723",
+            "hide_from_guests": false,
+            "value": 0,
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "3c97299d-8f82-4f02-9f1b-fa1cf6e84478",
+            "name": "PLZ",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1739375238939",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "8d3e7a32-a890-4be7-9f39-09a6dc2d64cb",
+            "name": "Qualifiziert?",
+            "type": "checkbox",
+            "type_config": {},
+            "date_created": "1739380080826",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "d081dda2-1058-458a-b2cc-7a57e703cc6b",
+            "name": "Raten",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1740412467364",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "6eca0d8a-12cf-4f71-ae4b-ab1abc480c33",
+            "name": "Straße",
+            "type": "short_text",
+            "type_config": {},
+            "date_created": "1739375215334",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "00c1cb95-eae1-4c94-9215-4abcc37067cc",
+            "name": "Wohnort",
+            "type": "short_text",
+            "type_config": {},
+            "date_created": "1739375223147",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "685a54c8-29d0-49e3-b5d0-851177c3529d",
+            "name": "e-mail-adresse",
+            "type": "email",
+            "type_config": {},
+            "date_created": "1741172008034",
+            "hide_from_guests": false,
+            "required": false
+        },
+        {
+            "id": "bd9efb33-bb2f-4541-b9c9-4bfed9ec67c9",
+            "name": "Anzahl der Gläubiger",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1738595306904",
+            "hide_from_guests": false,
+            "value": "15",
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "ff7958b2-08c0-4fb6-8d9c-fead5841626c",
+            "name": "Email",
+            "type": "email",
+            "type_config": {},
+            "date_created": "1737997971909",
+            "hide_from_guests": false,
+            "value": "cschafer738@gmail.com",
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "699bcb25-bbe2-454b-a6cd-f255681e7940",
+            "name": "Formular",
+            "type": "url",
+            "type_config": {},
+            "date_created": "1739282736000",
+            "hide_from_guests": false,
+            "value": "https://formular-mitarbeiter.vercel.app/form/8698acz7t",
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "ab2bd573-5f35-4acd-b0a1-7a88d0b0a3e0",
+            "name": "Nettoeinkommen",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1738595269158",
+            "hide_from_guests": false,
+            "value": "2200",
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "ddf34e92-af2b-4c1b-a380-41a5bcffdc13",
+            "name": "Schulden",
+            "type": "number",
+            "type_config": {},
+            "date_created": "1738595285960",
+            "hide_from_guests": false,
+            "value": "20000",
+            "value_richtext": null,
+            "required": false
+        },
+        {
+            "id": "c8638e01-13c6-4a7b-a4f4-e8dee45d9b1d",
+            "name": "Telefonnummer",
+            "type": "phone",
+            "type_config": {},
+            "date_created": "1737997971909",
+            "hide_from_guests": false,
+            "value": "+491736270805",
+            "value_richtext": null,
+            "required": false
+        }
+    ],
+    "dependencies": [],
+    "linked_tasks": [],
+    "locations": [],
+    "team_id": "9012066350",
+    "url": "https://app.clickup.com/t/8698acz7t",
+    "sharing": {
+        "public": false,
+        "public_share_expires_on": null,
+        "public_fields": [
+            "assignees",
+            "priority",
+            "due_date",
+            "content",
+            "comments",
+            "attachments",
+            "customFields",
+            "subtasks",
+            "tags",
+            "checklists",
+            "coverimage"
+        ],
+        "token": null,
+        "seo_optimized": false
+    },
+    "permission_level": "create",
+    "list": {
+        "id": "901207893673",
+        "name": "Leads",
+        "access": true
+    },
+    "project": {
+        "id": "90124675951",
+        "name": "CRM",
+        "hidden": false,
+        "access": true
+    },
+    "folder": {
+        "id": "90124675951",
+        "name": "CRM",
+        "hidden": false,
+        "access": true
+    },
+    "space": {
+        "id": "90123048145"
+    }
+}

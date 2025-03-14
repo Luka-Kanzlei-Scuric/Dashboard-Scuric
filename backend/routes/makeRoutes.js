@@ -2,27 +2,27 @@ const express = require('express');
 const router = express.Router();
 const Form = require('../models/Form');
 
-// Empfange Rohdaten von Make.com oder N8N und verarbeite sie im Backend
-// Hauptroute ohne Pfad für N8N
+// Empfange Rohdaten und verarbeite sie im Backend
+// Hauptroute ohne Pfad
 router.post('/', async (req, res) => {
-  console.log('N8N Root Endpunkt erreicht');
+  console.log('Root Endpunkt erreicht');
   console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
   
   // In Logs eintragen
-  addLog('info', 'N8N Anfrage erhalten', {
+  addLog('info', 'Webhook-Anfrage erhalten', {
     data: req.body,
     headers: req.headers
-  }, 'N8N Integration');
+  }, 'API Integration');
   
   // Erfolgreiches Ergebnis zurückgeben
   res.json({
     success: true,
-    message: 'N8N Anfrage empfangen',
+    message: 'Anfrage empfangen',
     received: true
   });
 });
 
-// Ursprüngliche Route beibehalten für Make.com
+// ClickUp-Synchronisierungsroute
 router.post('/clickup-sync', async (req, res) => {
   try {
     // Empfange die ClickUp-Tasks als Rohdaten
@@ -40,14 +40,14 @@ router.post('/clickup-sync', async (req, res) => {
     console.log(`Empfangene Tasks: ${tasks.length}`);
     
     // In Logs eintragen
-    addLog('info', `N8N Synchronisierung gestartet`, {
+    addLog('info', `ClickUp Synchronisierung gestartet`, {
       tasksCount: tasks.length,
       source: 'api',
       timestamp: new Date()
-    }, 'N8N Integration');
+    }, 'ClickUp Integration');
     
     if (tasks.length === 0) {
-      addLog('warning', 'Leerer Request erhalten', null, 'N8N Integration');
+      addLog('warning', 'Leerer Request erhalten', null, 'ClickUp Integration');
       return res.status(400).json({ 
         success: false, 
         message: 'Keine Tasks im Request gefunden oder Daten nicht im erwarteten Format' 
@@ -82,7 +82,7 @@ router.post('/clickup-sync', async (req, res) => {
           addLog('success', `Mandant aktualisiert: ${transformedData.leadName}`, {
             taskId: transformedData.taskId,
             operation: 'update'
-          }, 'N8N Integration');
+          }, 'ClickUp Integration');
         } else {
           // Erstelle neues Formular
           const newForm = new Form(transformedData);
@@ -91,7 +91,7 @@ router.post('/clickup-sync', async (req, res) => {
           addLog('success', `Neuer Mandant erstellt: ${transformedData.leadName}`, {
             taskId: transformedData.taskId,
             operation: 'create'
-          }, 'N8N Integration');
+          }, 'ClickUp Integration');
         }
       } catch (error) {
         console.error(`Fehler bei Task ${task.id}:`, error);
@@ -99,12 +99,12 @@ router.post('/clickup-sync', async (req, res) => {
         addLog('error', `Fehler bei der Verarbeitung von Task ${task.id || 'unbekannt'}`, {
           errorMessage: error.message,
           stackTrace: error.stack
-        }, 'N8N Integration');
+        }, 'ClickUp Integration');
       }
     }
     
     // Erfolgreiches Ergebnis loggen
-    addLog('info', 'N8N Synchronisierung abgeschlossen', results, 'N8N Integration');
+    addLog('info', 'ClickUp Synchronisierung abgeschlossen', results, 'ClickUp Integration');
     
     res.json({
       success: true,
@@ -115,10 +115,10 @@ router.post('/clickup-sync', async (req, res) => {
     console.error('Fehler bei der Verarbeitung der Daten:', error);
     
     // Fehler loggen
-    addLog('error', 'Fehler bei der N8N Synchronisierung', {
+    addLog('error', 'Fehler bei der ClickUp Synchronisierung', {
       errorMessage: error.message,
       stackTrace: error.stack
-    }, 'N8N Integration');
+    }, 'ClickUp Integration');
     
     res.status(500).json({ 
       success: false, 

@@ -2,13 +2,21 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const passport = require('passport');
+const session = require('express-session');
 require('dotenv').config();
+
+// Import Passport configuration
+const configurePassport = require('./config/passport');
 
 // Import DB config
 const connectDB = require('./config/db');
 
 // Express app initialisieren
 const app = express();
+
+// Serve static files from the public directory
+app.use(express.static('public'));
 
 //Middleware
 app.use(cors({
@@ -17,7 +25,8 @@ app.use(cors({
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:4173', // Preview-Modus von Vite
-        process.env.CORS_ORIGIN || 'https://dashboard-scuric.vercel.app', // Vercel Frontend URL
+        'https://dashboard-scuric.vercel.app', // Vercel Frontend URL
+        process.env.CORS_ORIGIN,
         '*' // Temporär alle Origins erlauben
     ].filter(Boolean),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -42,6 +51,26 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Configure session middleware (required for OAuth)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dashboard-clickup-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'none'
+  },
+  proxy: true
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Configure Passport
+configurePassport();
+
 // Basic test route
 app.get('/', (req, res) => {
     res.json({ message: 'Privatinsolvenz API läuft' });
@@ -61,31 +90,11 @@ app.get('/api/test-client', (req, res) => {
     });
 });
 
-// Direct ClickUp Test Route 
+// Direct ClickUp Test Route - Verwendet den ClickUp-Controller 
 app.get('/api/clickup-test', async (req, res) => {
     try {
-        const apiKey = process.env.CLICKUP_API_KEY || 'pk_84132000_89QTDVSH9ZPGW3WFSS5K8604I2KGOHMO';
-        
-        console.log('Testing ClickUp API with key:', apiKey.substring(0, 5) + '...');
-        
-        const axios = require('axios');
-        const response = await axios({
-            method: 'GET',
-            url: 'https://api.clickup.com/api/v2/team',
-            headers: {
-                'Authorization': apiKey
-            },
-            timeout: 10000
-        });
-        
-        res.json({
-            success: true,
-            message: 'ClickUp API connection successful',
-            teams: response.data.teams.map(team => ({
-                id: team.id,
-                name: team.name
-            }))
-        });
+        const clickupController = require('./controllers/clickupController');
+        await clickupController.testClickUpConnection(req, res);
     } catch (error) {
         console.error('ClickUp API Test Error:', error.message);
         res.status(500).json({
@@ -141,157 +150,30 @@ app.get('/api/test-logs', (req, res) => {
     });
 });
 
-// Direkter Endpunkt für N8N Integration
+// Webhook-Route für ClickUp - Wird an den ClickUp-Controller weitergeleitet
 app.post('/api/clickup-data', async (req, res) => {
-    console.log('N8N DIRECT API ENDPOINT REACHED');
+    console.log('ClickUp Webhook empfangen, leite an ClickUp-Controller weiter');
     
     try {
         // Logs-System importieren
         const makeRoutes = require('./routes/makeRoutes');
         const addLog = makeRoutes.addLog;
         
-        // Event-Daten extrahieren
-        let data = req.body;
-        console.log('Received data:', JSON.stringify(data, null, 2));
-        
-        // Korrigiere verschachtelte Daten von N8N (bei Content Type: JSON-Problem)
-        if (data && data["Content Type: JSON"]) {
-            data = [data["Content Type: JSON"]]; // In Array verpacken für Kompatibilität
-            console.log('Daten korrigiert aus Content-Type-Format');
-        }
-        
         // In Logs eintragen
         if (typeof addLog === 'function') {
-            addLog('info', 'N8N Webhook empfangen', data, 'N8N Integration');
-        }
-
-        // Webhook-Daten extrahieren und in Form umwandeln
-        const Form = require('./models/Form');
-        let results = {
-            created: 0,
-            updated: 0,
-            failed: 0,
-            processed: 0
-        };
-        
-        // Verarbeite Webhook-Daten
-        if (Array.isArray(data) && data.length > 0) {
-            for (const item of data) {
-                try {
-                    results.processed++;
-                    
-                    // Bei Webhook-Event direkter API-Call für Task-Details
-                    if (item.task_id && (item.event === 'taskCreated' || item.event === 'taskUpdated')) {
-                        const taskId = item.task_id;
-                        
-                        // Prüfe, ob der Task bereits existiert
-                        let form = await Form.findOne({ taskId: taskId });
-                        
-                        // ClickUp API-Utils importieren
-                        const clickupUtils = require('./utils/clickupUtils');
-                        
-                        try {
-                            // Vollständige Task-Details von ClickUp API abrufen
-                            const clickupTaskDetails = await clickupUtils.getTask(taskId);
-                            console.log(`Vollständige Task-Details abgerufen für ${taskId}`);
-                            
-                            // Daten transformieren mit Helper aus makeRoutes
-                            const transformClickUpData = require('./routes/makeRoutes').transformClickUpData;
-                            
-                            if (transformClickUpData) {
-                                // Transformiere die ClickUp-Daten
-                                const transformedData = transformClickUpData(clickupTaskDetails);
-                                
-                                if (form) {
-                                    // Vorhandenes Formular mit allen Daten aktualisieren
-                                    form = await Form.findOneAndUpdate(
-                                        { taskId: taskId },
-                                        { $set: transformedData },
-                                        { new: true }
-                                    );
-                                    results.updated++;
-                                    
-                                    if (typeof addLog === 'function') {
-                                        addLog('success', `Task vollständig aktualisiert: ${taskId} (${transformedData.leadName})`, {
-                                            taskId: taskId,
-                                            event: item.event,
-                                            leadName: transformedData.leadName
-                                        }, 'N8N Webhook');
-                                    }
-                                } else {
-                                    // Vollständiges Formular erstellen
-                                    const newForm = new Form(transformedData);
-                                    await newForm.save();
-                                    results.created++;
-                                    
-                                    if (typeof addLog === 'function') {
-                                        addLog('success', `Neuer Task angelegt: ${taskId} (${transformedData.leadName})`, {
-                                            taskId: taskId,
-                                            event: item.event,
-                                            leadName: transformedData.leadName
-                                        }, 'N8N Webhook');
-                                    }
-                                }
-                            } else {
-                                throw new Error('Transformationsfunktion nicht gefunden');
-                            }
-                        } catch (apiError) {
-                            // Fehler beim API-Aufruf oder der Transformation
-                            console.error(`Fehler beim Abrufen/Transformieren der ClickUp-Daten: ${apiError.message}`);
-                            addLog('error', `ClickUp API-Fehler: ${apiError.message}`, {
-                                taskId: taskId,
-                                error: apiError.message
-                            }, 'N8N Webhook');
-                            
-                            // Fallback: Erstelle/Aktualisiere minimale Version
-                            if (form) {
-                                // Nur Datum aktualisieren
-                                form = await Form.findOneAndUpdate(
-                                    { taskId: taskId },
-                                    { $set: { updatedAt: new Date() } },
-                                    { new: true }
-                                );
-                                results.updated++;
-                            } else {
-                                // Minimalversion erstellen
-                                const newForm = new Form({
-                                    taskId: taskId,
-                                    leadName: 'Neuer Lead von Webhook (unvollständig)',
-                                    phase: 'erstberatung',
-                                    createdAt: new Date(),
-                                    updatedAt: new Date()
-                                });
-                                await newForm.save();
-                                results.created++;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Fehler bei Verarbeitung:', error);
-                    results.failed++;
-                    
-                    if (typeof addLog === 'function') {
-                        addLog('error', 'Fehler bei Webhook-Verarbeitung', {
-                            error: error.message,
-                            item: item
-                        }, 'N8N Webhook');
-                    }
-                }
-            }
+            addLog('info', 'ClickUp Webhook empfangen', req.body, 'ClickUp Integration');
         }
         
-        // Erfolgreiche Antwort senden
-        res.json({
-            success: true,
-            message: 'N8N Webhook verarbeitet',
-            results: results,
-            timestamp: new Date().toISOString()
-        });
+        // An den ClickUp-Controller weiterleiten
+        const clickupController = require('./controllers/clickupController');
+        
+        // Request und Response an den Controller weiterleiten
+        await clickupController.handleClickUpWebhook(req, res);
     } catch (error) {
-        console.error('Fehler im N8N Endpoint:', error);
+        console.error('Fehler im ClickUp Webhook Endpoint:', error);
         res.status(500).json({
             success: false,
-            message: 'Fehler bei der Verarbeitung',
+            message: 'Fehler bei der Verarbeitung des Webhooks',
             error: error.message,
             timestamp: new Date().toISOString()
         });

@@ -1,269 +1,317 @@
+// backend/utils/clickupUtils.js
 const axios = require('axios');
+const OAuthToken = require('../models/OAuthToken');
 
-// ClickUp API Configuration
-const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY || 'pk_84132000_89QTDVSH9ZPGW3WFSS5K8604I2KGOHMO';
-const CLICKUP_API_URL = 'https://api.clickup.com/api/v2';
+// Get API variables from environment
+const API_KEY = process.env.CLICKUP_API_KEY;
+const API_URL = process.env.CLICKUP_API_URL || 'https://api.clickup.com/api/v2';
 
-// ClickUp List IDs (to be replaced with actual list IDs)
-const CLICKUP_LEADS_LIST_ID = process.env.CLICKUP_LEADS_LIST_ID;
-const CLICKUP_ANGEBOTE_LIST_ID = process.env.CLICKUP_ANGEBOTE_LIST_ID;
+/**
+ * Create ClickUp API client with either API key or OAuth token
+ * @param {string} accessToken - Optional OAuth access token
+ * @returns {Object} Axios client instance
+ */
+const createClickUpClient = async (accessToken) => {
+  let token = accessToken;
+  let authHeader = '';
 
-// ClickUp API client with authentication
-const clickupClient = axios.create({
-    baseURL: CLICKUP_API_URL,
+  // If no access token is provided, check if we should use OAuth or API key
+  if (!token) {
+    // First try to get the latest OAuth token from the database
+    try {
+      const latestToken = await OAuthToken.findOne({ provider: 'clickup' }).sort({ updatedAt: -1 });
+      
+      if (latestToken && latestToken.accessToken) {
+        // Check if token is expired
+        if (new Date(latestToken.expiresAt) > new Date()) {
+          token = latestToken.accessToken;
+          authHeader = `Bearer ${token}`;
+          console.log('Using OAuth token from database');
+        } else {
+          console.log('OAuth token expired, need to refresh');
+          // TODO: Implement token refresh logic here
+          // For now, fallback to API key
+          if (!API_KEY) {
+            throw new Error('No valid OAuth token and ClickUp API Key is not set');
+          }
+          authHeader = API_KEY;
+        }
+      } else {
+        // No OAuth token found, use API key
+        if (!API_KEY) {
+          throw new Error('ClickUp API Key is not set in environment variables');
+        }
+        authHeader = API_KEY;
+      }
+    } catch (error) {
+      console.error('Error getting OAuth token:', error);
+      
+      // Fallback to API key
+      if (!API_KEY) {
+        throw new Error('ClickUp API Key is not set in environment variables');
+      }
+      authHeader = API_KEY;
+    }
+  } else {
+    // Use the provided access token
+    authHeader = `Bearer ${token}`;
+  }
+
+  // Create axios client with appropriate authorization
+  const client = axios.create({
+    baseURL: API_URL,
     headers: {
-        'Authorization': CLICKUP_API_KEY, // ClickUp expects just the API key
-        'Content-Type': 'application/json'
+      'Authorization': authHeader,
+      'Content-Type': 'application/json'
     },
     timeout: 10000 // 10 seconds timeout
-});
+  });
 
-// Add interceptor for logging requests and responses during debugging
-clickupClient.interceptors.request.use(request => {
-    console.log('ClickUp API Request:', request.method, request.url);
+  // Add logging for debugging
+  client.interceptors.request.use(request => {
+    // Redact the Authorization header for security
+    const redactedRequest = { ...request };
+    if (redactedRequest.headers.Authorization) {
+      redactedRequest.headers.Authorization = 'REDACTED';
+    }
+    console.log(`ClickUp API Request: ${request.method.toUpperCase()} ${request.baseURL}${request.url}`);
     return request;
-}, error => {
-    console.error('ClickUp API Request Error:', error);
-    return Promise.reject(error);
-});
+  });
 
-clickupClient.interceptors.response.use(response => {
-    console.log('ClickUp API Response Status:', response.status);
-    return response;
-}, error => {
-    console.error('ClickUp API Response Error:', error.response?.status, error.response?.data || error.message);
-    return Promise.reject(error);
-});
-
-// Log the configuration for debugging
-console.log(`ClickUp configuration - API URL: ${CLICKUP_API_URL}`);
-console.log(`ClickUp configuration - Using API Key: ${CLICKUP_API_KEY.substring(0, 5)}...`);
-console.log(`ClickUp configuration - Leads List ID: ${CLICKUP_LEADS_LIST_ID}`);
-console.log(`ClickUp configuration - Angebote List ID: ${CLICKUP_ANGEBOTE_LIST_ID}`);
-
-/**
- * Get all tasks from a ClickUp list
- * @param {string} listId - ClickUp list ID
- * @returns {Promise} - Promise with task data
- */
-async function getTasksFromList(listId) {
-    try {
-        const response = await clickupClient.get(`/list/${listId}/task`);
-        return response.data;
-    } catch (error) {
-        console.error('⚠️ Error fetching tasks from ClickUp:', error.response?.data || error.message);
-        throw error;
+  client.interceptors.response.use(
+    response => {
+      console.log(`ClickUp API Success: ${response.config.url}`);
+      return response;
+    },
+    error => {
+      console.error('ClickUp API Error:', error.message);
+      if (error.response) {
+        console.error('API Response:', error.response.data);
+      }
+      return Promise.reject(error);
     }
-}
+  );
 
-/**
- * Get a single task from ClickUp by task ID
- * @param {string} taskId - ClickUp task ID
- * @returns {Promise} - Promise with task data
- */
-async function getTask(taskId) {
-    try {
-        const response = await clickupClient.get(`/task/${taskId}`);
-        return response.data;
-    } catch (error) {
-        console.error(`⚠️ Error fetching task ${taskId} from ClickUp:`, error.response?.data || error.message);
-        throw error;
+  return client;
+};
+
+// Map dashboard phases to ClickUp statuses
+const mapPhaseToClickUpStatus = (phase, isQualified) => {
+  if (isQualified) {
+    // Qualified leads mapping
+    switch (phase) {
+      case 'erstberatung': return 'QUALIFIZIERT';
+      case 'checkliste': return 'ANWALT';
+      case 'dokumente': return 'ANGEBOT UNTERSCHRIEBEN';
+      case 'abgeschlossen': return 'ABGESCHLOSSEN';
+      default: return 'QUALIFIZIERT';
     }
-}
-
-/**
- * Create a new task in ClickUp
- * @param {string} listId - ClickUp list ID
- * @param {object} taskData - Task data to create
- * @returns {Promise} - Promise with created task data
- */
-async function createTask(listId, taskData) {
-    try {
-        const response = await clickupClient.post(`/list/${listId}/task`, taskData);
-        return response.data;
-    } catch (error) {
-        console.error('⚠️ Error creating task in ClickUp:', error.response?.data || error.message);
-        throw error;
+  } else {
+    // Unqualified leads mapping
+    switch (phase) {
+      case 'erstberatung': return 'NEUE ANFRAGE';
+      case 'checkliste': return 'AUF TERMIN';
+      default: return 'NEUE ANFRAGE';
     }
-}
+  }
+};
 
-/**
- * Update an existing task in ClickUp
- * @param {string} taskId - ClickUp task ID
- * @param {object} taskData - Task data to update
- * @returns {Promise} - Promise with updated task data
- */
-async function updateTask(taskId, taskData) {
-    try {
-        const response = await clickupClient.put(`/task/${taskId}`, taskData);
-        return response.data;
-    } catch (error) {
-        console.error(`⚠️ Error updating task ${taskId} in ClickUp:`, error.response?.data || error.message);
-        throw error;
-    }
-}
+// Find custom field ID by name
+const findCustomFieldIdByName = (customFields, name) => {
+  const field = customFields.find(field => field.name === name);
+  return field ? field.id : null;
+};
 
-/**
- * Get all statuses for a list
- * @param {string} listId - ClickUp list ID
- * @returns {Promise} - Promise with list statuses
- */
-async function getListStatuses(listId) {
-    try {
-        const response = await clickupClient.get(`/list/${listId}`);
-        return response.data.statuses;
-    } catch (error) {
-        console.error(`⚠️ Error fetching statuses for list ${listId}:`, error.response?.data || error.message);
-        throw error;
-    }
-}
+// OAuth token management
+const saveOAuthToken = async (accessToken, refreshToken, expiresIn = 2592000) => {
+  try {
+    // Calculate expiry date (default to 30 days if not specified)
+    const expiresAt = new Date(Date.now() + (expiresIn * 1000));
+    
+    // Create new token record
+    const token = new OAuthToken({
+      provider: 'clickup',
+      accessToken,
+      refreshToken,
+      expiresAt
+    });
+    
+    // Save to database
+    await token.save();
+    console.log('OAuth token saved');
+    return token;
+  } catch (error) {
+    console.error('Error saving OAuth token:', error);
+    throw error;
+  }
+};
 
-/**
- * Maps the dashboard phase to the appropriate ClickUp status
- * @param {string} phase - Dashboard phase (erstberatung, checkliste, dokumente, abgeschlossen)
- * @param {string} listType - Type of list ("leads" or "angebote")
- * @returns {string} - Corresponding ClickUp status
- */
-function mapPhaseToClickUpStatus(phase, listType = "leads") {
-    if (listType === "leads") {
-        // This mapping should align with your CRM - Leads statuses
-        switch (phase) {
-            case 'erstberatung':
-                return 'NEUE ANFRAGE';
-            case 'checkliste':
-                return 'AUF TERMIN';
-            case 'dokumente':
-                return 'QUALIFIZIERT';
-            case 'abgeschlossen':
-                return 'ANWALT';
-            default:
-                return 'NEUE ANFRAGE';
+// Get tasks from a list
+const getTasksFromList = async (listId, accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.get(`/list/${listId}/task?archived=false&subtasks=false`);
+    return response.data.tasks || [];
+  } catch (error) {
+    console.error(`Error fetching tasks from list ${listId}:`, error);
+    throw error;
+  }
+};
+
+// Get a single task by ID
+const getTaskById = async (taskId, accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.get(`/task/${taskId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching task ${taskId}:`, error);
+    throw error;
+  }
+};
+
+// Update a task
+const updateTask = async (taskId, updateData, accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    
+    // First, get the task to retrieve custom field IDs
+    const task = await getTaskById(taskId, accessToken);
+    
+    // Extract custom fields data
+    const customFieldsData = {};
+    
+    if (updateData.custom_fields && task.custom_fields) {
+      // Map custom fields by name to their respective IDs
+      updateData.custom_fields.forEach(field => {
+        const fieldId = findCustomFieldIdByName(task.custom_fields, field.name);
+        if (fieldId) {
+          customFieldsData[fieldId] = field.value;
         }
-    } else if (listType === "angebote") {
-        // This mapping should align with your CRM - Angebote statuses
-        switch (phase) {
-            case 'erstberatung':
-                return 'QUALIFIZIERT';
-            case 'checkliste':
-                return 'ANGEBOTSZUSTELLUNG';
-            case 'dokumente':
-            case 'abgeschlossen':
-                return 'ANGEBOT UNTERSCHRIEBEN';
-            default:
-                return 'QUALIFIZIERT';
-        }
+      });
     }
     
-    return 'NEUE ANFRAGE'; // Default fallback
-}
+    // Prepare update payload
+    const payload = {
+      name: updateData.name,
+      status: updateData.status,
+      custom_fields: customFieldsData
+    };
+    
+    // Send update request
+    const response = await client.put(`/task/${taskId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating task ${taskId}:`, error);
+    throw error;
+  }
+};
 
-/**
- * Sync a form from the dashboard to ClickUp
- * @param {object} form - The form data from the dashboard
- * @returns {Promise} - Promise with sync result
- */
-async function syncFormToClickUp(form) {
-    try {
-        // First, try to get the task if it exists
-        let task;
-        try {
-            task = await getTask(form.taskId);
-        } catch (error) {
-            if (error.response && error.response.status === 404) {
-                console.log(`Task ${form.taskId} not found in ClickUp, will create a new one`);
-                task = null;
-            } else {
-                throw error;
-            }
-        }
-        
-        // Determine which list to use based on qualification status
-        const listId = form.qualifiziert ? CLICKUP_ANGEBOTE_LIST_ID : CLICKUP_LEADS_LIST_ID;
-        const listType = form.qualifiziert ? "angebote" : "leads";
-        
-        // Map phase to appropriate ClickUp status
-        const status = mapPhaseToClickUpStatus(form.phase, listType);
-        
-        // Prepare task data
-        const taskData = {
-            name: `${form.leadName} - Privatinsolvenz`,
-            status: status,
-            description: createTaskDescription(form),
-            custom_fields: mapFormToCustomFields(form)
-        };
-        
-        let result;
-        if (task) {
-            // Update existing task
-            result = await updateTask(form.taskId, taskData);
-            console.log(`✅ Updated task ${form.taskId} in ClickUp`);
-        } else {
-            // Create new task
-            result = await createTask(listId, taskData);
-            console.log(`✅ Created new task in ClickUp: ${result.id}`);
-        }
-        
-        return result;
-    } catch (error) {
-        console.error('❌ Error syncing form to ClickUp:', error);
-        throw error;
+// Create webhook for ClickUp events
+const createWebhook = async (listId, webhookUrl, events = ['taskCreated', 'taskUpdated', 'taskDeleted'], accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.post(`/list/${listId}/webhook`, {
+      endpoint: webhookUrl,
+      events: events
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error creating webhook for list ${listId}:`, error);
+    throw error;
+  }
+};
+
+// Get all webhooks for a list
+const getWebhooks = async (listId, accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.get(`/list/${listId}/webhook`);
+    return response.data.webhooks || [];
+  } catch (error) {
+    console.error(`Error fetching webhooks for list ${listId}:`, error);
+    throw error;
+  }
+};
+
+// Delete a webhook
+const deleteWebhook = async (webhookId, accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.delete(`/webhook/${webhookId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting webhook ${webhookId}:`, error);
+    throw error;
+  }
+};
+
+// Test ClickUp API connectivity
+const testConnection = async (accessToken) => {
+  try {
+    const client = await createClickUpClient(accessToken);
+    const response = await client.get('/user');
+    return {
+      success: true,
+      message: 'ClickUp API connection successful',
+      user: response.data.user
+    };
+  } catch (error) {
+    console.error('Error testing ClickUp API connection:', error);
+    throw error;
+  }
+};
+
+// Function to sync a form with ClickUp
+const syncFormToClickUp = async (form, accessToken) => {
+  try {
+    if (!form || !form.taskId) {
+      console.error('Invalid form or missing taskId for ClickUp sync');
+      throw new Error('Invalid form data for ClickUp sync');
     }
-}
 
-/**
- * Create a task description from form data
- * @param {object} form - The form data
- * @returns {string} - Formatted task description
- */
-function createTaskDescription(form) {
-    return `
-# Mandanten Information
+    // Get the appropriate status based on form phase
+    const status = mapPhaseToClickUpStatus(form.phase, form.qualifiziert);
 
-**Name:** ${form.leadName}
-**ID:** ${form.taskId}
-**Phase:** ${form.phase}
-**Qualifiziert:** ${form.qualifiziert ? 'Ja' : 'Nein'}
+    // Prepare data for ClickUp update
+    const updateData = {
+      name: form.leadName,
+      status: status,
+      custom_fields: [
+        { name: "Gesamtschulden", value: form.gesamtSchulden || "0" },
+        { name: "Gläubiger Anzahl", value: form.glaeubiger || "0" },
+        { name: "Straße", value: form.strasse || "" },
+        { name: "Hausnummer", value: form.hausnummer || "" },
+        { name: "PLZ", value: form.plz || "" },
+        { name: "Ort", value: form.wohnort || "" },
+        { name: "Telefonnummer", value: form.telefon || "" }
+      ]
+    };
 
-## Kontaktdaten
-**Adresse:** ${form.strasse || ''} ${form.hausnummer || ''}, ${form.plz || ''} ${form.wohnort || ''}
+    console.log(`Syncing task ${form.taskId} with status: ${status}`);
 
-## Finanzielle Situation
-**Gesamtschulden:** ${form.gesamtSchulden || 'Nicht angegeben'}
-**Anzahl Gläubiger:** ${form.glaeubiger || 'Nicht angegeben'}
-**Netto-Einkommen:** ${form.nettoEinkommen || 'Nicht angegeben'}
-
-## Notizen
-${form.notizen || 'Keine Notizen'}
-
----
-Automatisch synchronisiert vom Dashboard-System
-`;
-}
-
-/**
- * Map form fields to ClickUp custom fields
- * @param {object} form - The form data
- * @returns {array} - Array of custom field values for ClickUp
- */
-function mapFormToCustomFields(form) {
-    // This is a placeholder - you would need to replace the IDs with your actual ClickUp custom field IDs
-    // Ideally, these would come from environment variables
-    const customFields = [];
+    // Update the task in ClickUp
+    const result = await updateTask(form.taskId, updateData, accessToken);
     
-    // Example of mapping some fields (you'd need to get the actual field IDs from ClickUp)
-    // customFields.push({
-    //     id: "0a1b2c3d4e5f", // Custom field ID for Gesamtschulden
-    //     value: form.gesamtSchulden
-    // });
-    
-    return customFields;
-}
+    console.log(`Successfully updated task ${form.taskId}`);
+    return result;
+
+  } catch (error) {
+    console.error(`Error syncing form ${form.taskId || form._id} to ClickUp:`, error);
+    throw error;
+  }
+};
 
 module.exports = {
-    getTasksFromList,
-    getTask,
-    createTask,
-    updateTask,
-    getListStatuses,
-    syncFormToClickUp
+  createClickUpClient,
+  mapPhaseToClickUpStatus,
+  getTasksFromList,
+  getTaskById,
+  updateTask,
+  createWebhook,
+  getWebhooks,
+  deleteWebhook,
+  testConnection,
+  syncFormToClickUp,
+  saveOAuthToken
 };

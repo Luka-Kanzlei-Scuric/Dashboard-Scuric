@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickUp OAuth Integration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ClickUp OAuth Integration</h1>
+        
+        <div id="oauth-status" class="status info">
+            Checking OAuth status...
+        </div>
+        
+        <div>
+            <button id="connect-btn" onclick="initiateOAuth()">Connect with ClickUp</button>
+            <button id="test-btn" onclick="testConnection()">Test Connection</button>
+        </div>
+        
+        <div id="connection-result" style="margin-top: 20px; display: none;">
+            <h2>Connection Test Results</h2>
+            <pre id="result-data"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Check OAuth status when page loads
+        window.onload = async function() {
+            await checkOAuthStatus();
+        };
+
+        // Function to check OAuth status
+        async function checkOAuthStatus() {
+            try {
+                const response = await fetch('/api/clickup/oauth/status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('oauth-status');
+                
+                if (data.success) {
+                    if (data.authenticated) {
+                        statusDiv.className = 'status success';
+                        statusDiv.innerHTML = `
+                            <strong>Connected to ClickUp!</strong><br>
+                            Authentication provider: ${data.provider}<br>
+                            Expires: ${new Date(data.expires).toLocaleString()}
+                        `;
+                    } else {
+                        statusDiv.className = 'status info';
+                        statusDiv.innerHTML = `
+                            <strong>Not connected to ClickUp</strong><br>
+                            Click the "Connect with ClickUp" button to authenticate.
+                        `;
+                    }
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = `
+                        <strong>Error checking OAuth status</strong><br>
+                        ${data.message || 'Unknown error'}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error checking OAuth status:', error);
+                const statusDiv = document.getElementById('oauth-status');
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>Error checking OAuth status</strong><br>
+                    ${error.message || 'Unknown error'}
+                `;
+            }
+        }
+
+        // Function to initiate OAuth flow
+        function initiateOAuth() {
+            const currentUrl = window.location.href;
+            window.location.href = `/api/clickup/oauth?redirectUrl=${encodeURIComponent(currentUrl)}`;
+        }
+
+        // Function to test the connection
+        async function testConnection() {
+            try {
+                const resultDiv = document.getElementById('connection-result');
+                const resultData = document.getElementById('result-data');
+                
+                resultDiv.style.display = 'block';
+                resultData.innerText = 'Testing connection...';
+                
+                const response = await fetch('/api/clickup/test');
+                const data = await response.json();
+                
+                resultData.innerText = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Error testing connection:', error);
+                const resultDiv = document.getElementById('connection-result');
+                const resultData = document.getElementById('result-data');
+                
+                resultDiv.style.display = 'block';
+                resultData.innerText = `Error: ${error.message || 'Unknown error'}`;
+            }
+        }
+    </script>
+</body>
+</html>
