@@ -76,34 +76,7 @@ app.get('/', (req, res) => {
     res.json({ message: 'Privatinsolvenz API läuft' });
 });
 
-// Test client route
-app.get('/api/test-client', (req, res) => {
-    res.json({
-        taskId: "TEST001",
-        leadName: "Test Mandant",
-        phase: "erstberatung",
-        qualifiziert: false,
-        glaeubiger: "3",
-        gesamtSchulden: "15000",
-        createdAt: new Date(),
-        updatedAt: new Date()
-    });
-});
-
-// Direct ClickUp Test Route - Verwendet den ClickUp-Controller 
-app.get('/api/clickup-test', async (req, res) => {
-    try {
-        const clickupController = require('./controllers/clickupController');
-        await clickupController.testClickUpConnection(req, res);
-    } catch (error) {
-        console.error('ClickUp API Test Error:', error.message);
-        res.status(500).json({
-            success: false,
-            message: 'ClickUp API connection failed',
-            error: error.response?.data || error.message
-        });
-    }
-});
+// Production ready - test routes removed
 
 // Routes
 app.use('/api/forms', require('./routes/formRoutes'));
@@ -114,43 +87,31 @@ app.use('/api/make', require('./routes/makeRoutes'));
 // Integration Routes - disabled for Make.com integration
 // app.use('/api/integration', require('./routes/integrationRoutes'));
 
-// Test Logs Endpoint für Frontend
-app.get('/api/test-logs', (req, res) => {
-    console.log('Test logs endpoint called');
-    const testLogs = [
-        {
-            type: 'info',
-            message: 'System gestartet',
-            source: 'Backend',
-            timestamp: new Date(),
-            details: null
-        },
-        {
-            type: 'success',
-            message: 'Datenbankverbindung hergestellt',
-            source: 'Database',
-            timestamp: new Date(),
-            details: null
-        },
-        {
-            type: 'warning',
-            message: 'Langsame Anfrage',
-            source: 'API',
-            timestamp: new Date(),
-            details: { duration: '2500ms', endpoint: '/api/test' }
-        }
-    ];
-    
-    // CORS-Header explizit setzen
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    
-    res.json({
-        success: true,
-        logs: testLogs,
-        timestamp: new Date().toISOString()
-    });
+// Real logs endpoint for frontend
+app.get('/api/logs', (req, res) => {
+    try {
+        // Get logs from makeRoutes module
+        const makeRoutes = require('./routes/makeRoutes');
+        const logs = makeRoutes.getLogs ? makeRoutes.getLogs() : [];
+        
+        // CORS-Header explizit setzen
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type');
+        
+        res.json({
+            success: true,
+            logs: logs,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error getting logs:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get logs',
+            error: error.message
+        });
+    }
 });
 
 // Webhook-Route für Make.com - Wird an den ClickUp-Controller weitergeleitet
@@ -213,8 +174,8 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
     console.log(`Server läuft auf Port ${PORT}`);
     console.log(`Verfügbare Routen:`);
-    console.log(`GET / - Test Basisroute`);
-    console.log(`GET /api/test-client - Test Client Daten`);
-    console.log(`GET /api/clickup-test - ClickUp API Test`);
-    console.log(`GET /api/clickup/test - ClickUp API Erweiterer Test`);
+    console.log(`GET / - API Status`);
+    console.log(`GET /api/forms - Formulare abrufen`);
+    console.log(`GET /api/logs - Logs abrufen`);
+    console.log(`POST /api/clickup/make-webhook - Make.com Webhook-Endpunkt`);
 });

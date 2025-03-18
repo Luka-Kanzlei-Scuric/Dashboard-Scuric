@@ -166,8 +166,9 @@ function addLog(type, message, details = null, source = 'System') {
   return logEntry;
 }
 
-// Exportiere addLog-Funktion für andere Module
+// Exportiere Funktionen für andere Module
 module.exports.addLog = addLog;
+module.exports.getLogs = () => logs;
 
 // Logs abrufen
 router.get('/logs', (req, res) => {
@@ -195,37 +196,7 @@ router.get('/logs', (req, res) => {
   }
 });
 
-// Vereinfachte Test-Route ohne Datenbankzugriff
-router.post('/test', (req, res) => {
-  try {
-    console.log('Test endpoint hit');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
-    // Simuliere eine Verarbeitung ohne Datenbankzugriff
-    const receivedData = req.body;
-    let processedCount = 0;
-    
-    if (Array.isArray(receivedData)) {
-      processedCount = receivedData.length;
-    } else if (receivedData && typeof receivedData === 'object') {
-      processedCount = 1;
-    }
-    
-    res.json({
-      success: true,
-      message: 'Test successful',
-      processed: processedCount,
-      receivedData: req.body
-    });
-  } catch (error) {
-    console.error('Error in test endpoint:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error in test endpoint',
-      error: error.message
-    });
-  }
-});
+// Produktionsbereit - Testroute entfernt
 
 // Hilfsfunktion zur Transformation der ClickUp-Daten in das gewünschte Format
 function transformClickUpData(clickupTask) {
