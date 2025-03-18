@@ -1,12 +1,12 @@
-# Make.com Integration Guide für Scuric Dashboard
+# Make.com Integration Guide fÃ¼r Scuric Dashboard
 
-Diese Anleitung erklärt, wie die Integration zwischen ClickUp, Make.com und dem Scuric Dashboard funktioniert und wie sie konfiguriert wird.
+Diese Anleitung erklÃ¤rt, wie die Integration zwischen ClickUp, Make.com und dem Scuric Dashboard funktioniert und wie sie konfiguriert wird.
 
-## Überblick
+## Ãœberblick
 
-Die Integration ermöglicht es, Aufgaben (Tasks) von ClickUp automatisch ins Dashboard zu importieren:
+Die Integration ermÃ¶glicht es, Aufgaben (Tasks) von ClickUp automatisch ins Dashboard zu importieren:
 
-1. Make.com überwacht ClickUp auf neue oder aktualisierte Aufgaben
+1. Make.com Ã¼berwacht ClickUp auf neue oder aktualisierte Aufgaben
 2. Wenn eine Aufgabe erstellt oder aktualisiert wird, sendet Make.com die Daten an das Dashboard-Backend
 3. Das Backend verarbeitet die Daten und speichert sie in der Datenbank
 4. Die Aufgabe erscheint als neuer Mandant im Dashboard
@@ -37,7 +37,7 @@ cd backend
 npm run dev
 ```
 
-4. Der Backend-Endpunkt, der die Daten von Make.com empfängt, ist:
+4. Der Backend-Endpunkt, der die Daten von Make.com empfÃ¤ngt, ist:
 ```
 /api/clickup/make-webhook
 ```
@@ -46,16 +46,16 @@ npm run dev
 
 1. **Erstelle ein neues Szenario in Make.com**
 
-2. **Füge den ClickUp-Trigger hinzu**:
-   - Wähle ClickUp als App
-   - Wähle "Watch Tasks" oder "Watch Events" als Trigger
+2. **FÃ¼ge den ClickUp-Trigger hinzu**:
+   - WÃ¤hle ClickUp als App
+   - WÃ¤hle "Watch Tasks" oder "Watch Events" als Trigger
    - Authentifiziere dich mit deinem ClickUp-Konto
-   - Wähle den relevanten Workspace und die Liste aus, die du überwachen möchtest
-   - Konfiguriere, welche Ereignisse überwacht werden sollen (Aufgaben erstellen, aktualisieren, etc.)
+   - WÃ¤hle den relevanten Workspace und die Liste aus, die du Ã¼berwachen mÃ¶chtest
+   - Konfiguriere, welche Ereignisse Ã¼berwacht werden sollen (Aufgaben erstellen, aktualisieren, etc.)
 
-3. **Füge einen HTTP-Request hinzu**:
-   - Wähle "HTTP" als App
-   - Wähle "Make a request" als Aktion
+3. **FÃ¼ge einen HTTP-Request hinzu**:
+   - WÃ¤hle "HTTP" als App
+   - WÃ¤hle "Make a request" als Aktion
    - Konfiguriere den Request:
      - URL: `https://deine-backend-url/api/clickup/make-webhook`
      - Methode: POST
@@ -74,7 +74,7 @@ npm run dev
 4. **Teste das Szenario**:
    - Klicke auf "Run once" in Make.com
    - Erstelle oder aktualisiere eine Aufgabe in ClickUp
-   - Überprüfe die Logs im Backend und in Make.com
+   - ÃœberprÃ¼fe die Logs im Backend und in Make.com
 
 ## Datenstruktur
 
@@ -91,12 +91,12 @@ Das Backend erwartet mindestens die folgenden Felder von ClickUp:
   "date_updated": "1629384567890",
   "custom_fields": [
     {
-      "name": "Gesamtschulden",
-      "value": "15000"
+      "name": "Email",
+      "value": "kunde@example.com"
     },
     {
-      "name": "Gläubiger Anzahl",
-      "value": "3"
+      "name": "Telefonnummer",
+      "value": "+49123456789"
     }
   ]
 }
@@ -108,21 +108,21 @@ Das Backend transformiert diese Daten ins interne Format und speichert sie als F
 
 ### Kein Datenempfang im Backend
 
-1. Überprüfe die Make.com-Ausführungsprotokolle
-2. Stelle sicher, dass die richtige URL für den Webhook konfiguriert ist
-3. Überprüfe die Backend-Logs auf Fehler
+1. ÃœberprÃ¼fe die Make.com-AusfÃ¼hrungsprotokolle
+2. Stelle sicher, dass die richtige URL fÃ¼r den Webhook konfiguriert ist
+3. ÃœberprÃ¼fe die Backend-Logs auf Fehler
 
 ### Make.com Fehler
 
-1. Stelle sicher, dass dein ClickUp-API-Token gültig ist
-2. Überprüfe die Berechtigungen für die ClickUp-Liste
+1. Stelle sicher, dass dein ClickUp-API-Token gÃ¼ltig ist
+2. ÃœberprÃ¼fe die Berechtigungen fÃ¼r die ClickUp-Liste
 3. Validiere das JSON-Format der gesendeten Daten
 
 ## Erweiterungen
 
-Nach der Grundkonfiguration können folgende Erweiterungen hinzugefügt werden:
+Nach der Grundkonfiguration kÃ¶nnen folgende Erweiterungen hinzugefÃ¼gt werden:
 
-1. **Bidirektionale Synchronisierung**: Änderungen im Dashboard zurück zu ClickUp senden
+1. **Bidirektionale Synchronisierung**: Ã„nderungen im Dashboard zurÃ¼ck zu ClickUp senden
 2. **Statusaktualisierungen**: Dashboard-Status mit ClickUp-Status synchronisieren
 3. **Dokumentenintegration**: Dokumente aus ClickUp ins Dashboard importieren
 

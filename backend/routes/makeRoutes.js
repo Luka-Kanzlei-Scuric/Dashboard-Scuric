@@ -276,8 +276,10 @@ function transformClickUpData(clickupTask) {
     hausnummer: customFields['Hausnummer'] || '',
     plz: customFields['PLZ'] || '',
     wohnort: customFields['Ort'] || '',
+    email: customFields['Email'] || '',
+    telefon: customFields['Telefonnummer'] || '',
     
-    // Finanzielle Daten
+    // Finanzielle Daten (optional)
     gesamtSchulden: customFields['Gesamtschulden'] || '0',
     glaeubiger: customFields['Gläubiger Anzahl'] || '0',
     
