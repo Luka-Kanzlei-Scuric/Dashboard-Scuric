@@ -153,9 +153,9 @@ app.get('/api/test-logs', (req, res) => {
     });
 });
 
-// Webhook-Route für ClickUp - Wird an den ClickUp-Controller weitergeleitet
+// Webhook-Route für Make.com - Wird an den ClickUp-Controller weitergeleitet
 app.post('/api/clickup-data', async (req, res) => {
-    console.log('ClickUp Webhook empfangen, leite an ClickUp-Controller weiter');
+    console.log('Make.com Webhook empfangen, leite an ClickUp-Controller weiter');
     
     try {
         // Logs-System importieren
@@ -164,16 +164,16 @@ app.post('/api/clickup-data', async (req, res) => {
         
         // In Logs eintragen
         if (typeof addLog === 'function') {
-            addLog('info', 'ClickUp Webhook empfangen', req.body, 'ClickUp Integration');
+            addLog('info', 'Make.com Webhook empfangen', req.body, 'Make Integration');
         }
         
         // An den ClickUp-Controller weiterleiten
         const clickupController = require('./controllers/clickupController');
         
-        // Request und Response an den Controller weiterleiten
-        await clickupController.handleClickUpWebhook(req, res);
+        // Request und Response an den Make-Webhook-Handler weiterleiten
+        await clickupController.handleMakeWebhook(req, res);
     } catch (error) {
-        console.error('Fehler im ClickUp Webhook Endpoint:', error);
+        console.error('Fehler im Make.com Webhook Endpoint:', error);
         res.status(500).json({
             success: false,
             message: 'Fehler bei der Verarbeitung des Webhooks',
