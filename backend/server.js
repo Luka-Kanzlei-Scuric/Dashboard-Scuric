@@ -111,6 +111,9 @@ app.use('/api/forms', require('./routes/formRoutes'));
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
 
+// Integration Routes - NEW
+app.use('/api/integration', require('./routes/integrationRoutes'));
+
 // Test Logs Endpoint für Frontend
 app.get('/api/test-logs', (req, res) => {
     console.log('Test logs endpoint called');
@@ -180,22 +183,10 @@ app.post('/api/clickup-data', async (req, res) => {
     }
 });
 
-// Try-catch für ClickUp-Routes
+// Load ClickUp routes - simplified for Make.com integration
 try {
     app.use('/api/clickup', require('./routes/clickupRoutes'));
     console.log("ClickUp-Routen erfolgreich geladen");
-    
-    // Root domain OAuth callback route for ClickUp's restrictions
-    app.get('/', (req, res, next) => {
-        // Check if this is an OAuth callback from ClickUp
-        if (req.query.code && req.query.state) {
-            console.log("Detected ClickUp OAuth callback on root URL");
-            const oauthController = require('./controllers/oauthController');
-            return oauthController.handleOAuthCallback(req, res, next);
-        }
-        // Otherwise, proceed to the normal home route
-        next();
-    });
 } catch (error) {
     console.error("Fehler beim Laden der ClickUp-Routen:", error.message);
     

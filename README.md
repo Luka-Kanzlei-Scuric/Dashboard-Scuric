@@ -55,7 +55,31 @@ VITE_API_URL=http://localhost:5001/api
 
 ## Make.com Integration
 
-Die Integration mit ClickUp erfolgt über Make.com. Das Szenario ruft Tasks aus ClickUp ab und sendet sie an den `/api/make/clickup-sync` Endpunkt.
+Die Integration mit ClickUp erfolgt über Make.com. 
+
+### Setup
+
+1. Kopiere die Beispiel-Umgebungsdatei:
+   ```
+   cp .env.make-example .env
+   ```
+
+2. Bearbeite die `.env`-Datei und aktualisiere folgende Werte:
+   - `MAKE_WEBHOOK_URL`: Deine Make.com Webhook-URL
+   - `MONGODB_URI`: Deine MongoDB-Verbindungszeichenfolge
+   - `FRONTEND_URL`: URL deiner Frontend-Anwendung
+   - `PORT`: Der Port für den Backend-Server
+
+3. Make.com-Szenario einrichten:
+   - Erstelle ein neues Szenario in Make.com
+   - Füge ein ClickUp-Trigger-Modul hinzu (z.B. "Watch Tasks")
+   - Konfiguriere den Trigger, um neue oder aktualisierte Tasks zu beobachten
+   - Füge ein HTTP-Modul hinzu, um Daten an dein Backend zu senden:
+     - URL: `https://deine-backend-url/api/clickup/make-webhook`
+     - Methode: POST
+     - Body: Mappe die ClickUp-Task-Daten vom Trigger
+
+Diese Integration sendet ClickUp-Aufgabendaten an den `/api/clickup/make-webhook` Endpunkt.
 
 ## Deployment
 
