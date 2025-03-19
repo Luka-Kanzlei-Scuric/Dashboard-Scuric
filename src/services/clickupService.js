@@ -61,6 +61,27 @@ const importClickUpTask = async (taskId) => {
 };
 
 /**
+ * Sync a specific form with ClickUp
+ * @param {string} taskId - Task ID to sync
+ * @returns {Promise} - Promise with sync result
+ */
+const syncFormWithClickUp = async (taskId) => {
+  try {
+    const response = await axios.post(`${BACKEND_URL}/api/integrations/sync/${taskId}`);
+    return {
+      success: true,
+      ...response.data
+    };
+  } catch (error) {
+    console.error('Error syncing form with ClickUp:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message
+    };
+  }
+};
+
+/**
  * Sync all forms with ClickUp
  * @returns {Promise} - Promise with sync results
  */
@@ -78,5 +99,6 @@ export {
   getClientsList,
   getClickUpLeads,
   importClickUpTask,
+  syncFormWithClickUp,
   syncAllWithClickUp
 };
