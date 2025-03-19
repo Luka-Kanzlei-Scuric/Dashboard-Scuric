@@ -84,8 +84,8 @@ app.use('/api/forms', require('./routes/formRoutes'));
 // Make.com-Routes
 app.use('/api/make', require('./routes/makeRoutes'));
 
-// Integration Routes - disabled for Make.com integration
-// app.use('/api/integration', require('./routes/integrationRoutes'));
+// Integration Routes
+app.use('/api/integrations', require('./routes/integrationRoutes'));
 
 // Real logs endpoint for frontend
 app.get('/api/logs', (req, res) => {
