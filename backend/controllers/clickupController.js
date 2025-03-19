@@ -378,25 +378,16 @@ function isQualified(status) {
   return qualifiedStatuses.includes(status);
 }
 
-// Definiere eine Fallback-Logfunktion
+// Definiere eine Fallback-Logfunktion die wir immer benutzen können
 function fallbackLog(type, message, details = null, source = 'System') {
   console.log(`[${type.toUpperCase()}] [${source}] ${message}`, details ? JSON.stringify(details) : '');
+  return { type, message, details, source, timestamp: new Date() };
 }
 
 // Process Make.com webhook for ClickUp tasks
 exports.handleMakeWebhook = async (req, res) => {
-  // Load logging system if available
-  let addLog = fallbackLog;
-  try {
-    const makeRoutes = require('../routes/makeRoutes');
-    if (typeof makeRoutes.addLog === 'function') {
-      addLog = makeRoutes.addLog;
-    } else {
-      console.log('makeRoutes.addLog is not a function, using fallback logger');
-    }
-  } catch (e) {
-    console.log('Logging system not available:', e.message);
-  }
+  // Verwende immer die Fallback-Funktion, um zirkuläre Abhängigkeiten zu vermeiden
+  const addLog = fallbackLog;
   
   try {
     // Starte Timer für Performance-Messung
@@ -579,8 +570,9 @@ exports.handleMakeWebhook = async (req, res) => {
       taskData = req.body;
     }
     
-    // Transform task data using the utility function
-    const transformedData = transformClickUpData(taskData);
+    // Transform task data using the exported function
+    // Wichtig: Wir müssen hier auf exports.transformClickUpData zugreifen
+    const transformedData = exports.transformClickUpData(taskData);
     
     // Log the transformed data for debugging
     console.log('TRANSFORMED CLICKUP DATA:', JSON.stringify(transformedData, null, 2));

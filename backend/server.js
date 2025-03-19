@@ -126,9 +126,9 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
-// VEREINFACHTE Webhook-Route für Make.com - Direkte Verarbeitung ohne komplexe Controller
+// SUPER-VEREINFACHTE Webhook-Route für Make.com - Minimale Version für maximale Zuverlässigkeit
 app.post('/api/clickup-data', async (req, res) => {
-    console.log('Make.com Webhook empfangen - VEREINFACHTE VERARBEITUNG');
+    console.log('Make.com Webhook empfangen - SUPER-VEREINFACHTE VERARBEITUNG');
     console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
     
     try {
@@ -151,36 +151,39 @@ app.post('/api/clickup-data', async (req, res) => {
             }
         }
         
-        // Extrahiere nur die notwendigsten Daten
-        let taskId = null;
-        let leadName = "Neuer Mandant";
+        // MINIMALE Datenextraktion - nur ID und Name sind notwendig
+        // Alle Werte in String konvertieren um Typprobleme zu vermeiden
+        let taskId = String(taskData.id || taskData.taskId || taskData.task_id || `temp-${Date.now()}`);
+        let leadName = String(taskData.name || taskData.title || taskData.leadName || "Neuer Mandant");
+        
+        // Optional: Versuch, Status und Kontaktinformationen zu extrahieren
         let status = "NEUE ANFRAGE";
         let email = "";
         let telefon = "";
         
-        // Versuche taskId zu finden (Priorität: id > taskId > task_id)
-        if (taskData.id) taskId = taskData.id;
-        else if (taskData.taskId) taskId = taskData.taskId;
-        else if (taskData.task_id) taskId = taskData.task_id;
-        else taskId = `temp-${Date.now()}`; // Fallback
-        
-        // Versuche Namen zu finden
-        if (taskData.name) leadName = taskData.name;
-        else if (taskData.title) leadName = taskData.title;
-        else if (taskData.leadName) leadName = taskData.leadName;
-        
-        // Versuche Status zu finden
-        if (typeof taskData.status === 'string') {
-            status = taskData.status;
-        } else if (taskData.status && taskData.status.status) {
-            status = taskData.status.status;
-        } else if (taskData.status_name) {
-            status = taskData.status_name;
+        // Einfache Status-Extraktion
+        if (taskData.status) {
+            if (typeof taskData.status === 'string') {
+                status = taskData.status;
+            } else if (taskData.status.status) {
+                status = taskData.status.status;
+            }
         }
         
-        // Versuche Kontaktinformationen zu finden
+        // Einfache Email-Extraktion
         if (taskData.email) email = taskData.email;
-        if (taskData.telefon || taskData.phone) telefon = taskData.telefon || taskData.phone;
+        
+        // Einfache Telefon-Extraktion
+        if (taskData.telefon) telefon = taskData.telefon;
+        if (taskData.phone) telefon = taskData.phone;
+        
+        // Extrahiere aus Custom Fields, falls vorhanden
+        if (Array.isArray(taskData.custom_fields)) {
+            taskData.custom_fields.forEach(field => {
+                if (field.name === "Email" && field.value) email = field.value;
+                if (field.name === "Telefonnummer" && field.value) telefon = field.value;
+            });
+        }
         
         // Prüfen, ob der Task bereits existiert
         let form = await Form.findOne({ taskId });
@@ -191,12 +194,9 @@ app.post('/api/clickup-data', async (req, res) => {
             form.leadName = leadName;
             form.updatedAt = new Date();
             
-            // Füge den Status dem clickupData hinzu, wenn er nicht existiert
-            if (!form.clickupData) {
-                form.clickupData = { status: status };
-            } else {
-                form.clickupData.status = status;
-            }
+            // Status aktualisieren - direkter Zugriff statt verschachtelter Struktur
+            form.clickupData = form.clickupData || {};
+            form.clickupData.status = status;
             
             // Aktualisiere Kontaktinformationen, wenn vorhanden
             if (email) form.email = email;
@@ -207,20 +207,18 @@ app.post('/api/clickup-data', async (req, res) => {
             console.log(`Erstelle neuen Task ${taskId}`);
             isNew = true;
             
-            // Erstelle ein neues Formular mit den empfangenen Daten
+            // Erstelle ein neues Formular mit minimalen Daten
             form = new Form({
                 taskId: taskId,
                 leadName: leadName,
                 phase: 'erstberatung',
                 qualifiziert: false,
-                email: email || 'keine@angabe.com',
-                telefon: telefon || 'keine',
+                email: email || '',
+                telefon: telefon || '',
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 clickupData: {
-                    status: status,
-                    statusColor: '#cccccc',
-                    priority: 'normal'
+                    status: status
                 }
             });
             
@@ -236,9 +234,7 @@ app.post('/api/clickup-data', async (req, res) => {
             form: {
                 id: form.taskId,
                 name: form.leadName,
-                status: form.clickupData?.status || status,
-                email: form.email,
-                telefon: form.telefon
+                status: form.clickupData?.status || status
             }
         });
         
@@ -251,6 +247,47 @@ app.post('/api/clickup-data', async (req, res) => {
             message: 'Fehler bei der Verarbeitung',
             error: error.message
         });
+    }
+});
+
+// Alternative Make-Route - noch einfachere Version
+app.post('/api/make-webhook', async (req, res) => {
+    console.log('Make.com Webhook: ALTERNATIVE ROUTE');
+    console.log('Received data:', JSON.stringify(req.body, null, 2));
+    
+    try {
+        const Form = require('./models/Form');
+        const data = req.body;
+        
+        // Absolute Mindestdaten extrahieren
+        const taskId = String(data.id || data.taskId || `make-${Date.now()}`);
+        const name = String(data.name || data.title || "Mandant von Make");
+        
+        // In Datenbank speichern
+        let form = await Form.findOne({ taskId });
+        
+        if (form) {
+            form.leadName = name;
+            form.updatedAt = new Date();
+            await form.save();
+            console.log('Updated existing form:', taskId);
+        } else {
+            form = new Form({
+                taskId,
+                leadName: name,
+                phase: 'erstberatung',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+            await form.save();
+            console.log('Created new form:', taskId);
+        }
+        
+        res.json({ success: true, id: taskId, name });
+        
+    } catch (error) {
+        console.error('Error processing Make webhook:', error);
+        res.status(200).json({ success: false, error: error.message });
     }
 });
 
