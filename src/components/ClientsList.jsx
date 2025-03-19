@@ -39,119 +39,148 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
         setRefreshTrigger(prev => prev + 1);
     };
     
-    // Load clients from API
+    // Load clients from API with multiple fallback mechanisms
     useEffect(() => {
         const fetchClients = async () => {
             setIsLoading(true);
-            try {
-                console.log("Fetching clients from:", `${BACKEND_URL}/api/forms`);
-                
-                const response = await fetch(`${BACKEND_URL}/api/forms`, {
-                    credentials: 'include', 
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    mode: 'cors'
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to fetch clients');
+            
+            // Array von APIs, die wir in Reihenfolge versuchen werden
+            const apiEndpoints = [
+                {
+                    url: `${BACKEND_URL}/api/forms`,
+                    description: 'Standard API-Endpunkt'
+                },
+                {
+                    url: `${BACKEND_URL}/api/clickup/debug-forms`,
+                    description: 'Alternative Debug-API'
+                },
+                {
+                    url: `${BACKEND_URL}/api/integrations/status`,
+                    description: 'Integrations-Status-API (nur zur Konnektivitätsprüfung)'
                 }
+            ];
+            
+            let success = false;
+            let errorDetails = [];
+            
+            // Versuche nacheinander die verschiedenen Endpoints
+            for (const endpoint of apiEndpoints) {
+                if (success) break;
                 
-                const data = await response.json();
-                
-                // Debug-Ausgabe
-                console.log("Raw data from backend:", data);
-                
-                // Extrahiere die Forms aus der Response (Backend gibt { forms: [...], pagination: {...} } zurück)
-                // Verarbeite verschiedene Datenstrukturen
-                let formsArray;
-                if (data.forms) {
-                    // Form controller gibt { forms: [...] } zurück
-                    formsArray = data.forms;
-                } else if (Array.isArray(data)) {
-                    // Direct array
-                    formsArray = data;
-                } else {
-                    // Einzelnes Objekt
-                    formsArray = [data];
-                }
-                
-                if (!Array.isArray(formsArray)) {
-                    console.error("Received data is not an array and has no forms property:", data);
-                    throw new Error('Unexpected data format from backend');
-                }
-                
-                // Filtere ungültige Einträge
-                formsArray = formsArray.filter(item => item && item.taskId);
-                
-                // Transform data for frontend display
-                const formattedData = formsArray.map(client => ({
-                    id: client.taskId || client._id,
-                    name: client.leadName,
-                    schulden: client.gesamtSchulden || "0",
-                    phase: client.phase || "erstberatung",
-                    phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
-                    qualifiziert: client.qualifiziert || false,
-                    createdAt: new Date(client.createdAt),
-                    updatedAt: new Date(client.updatedAt)
-                }));
-                
-                // Sortiere nach neuesten Updates
-                formattedData.sort((a, b) => b.updatedAt - a.updatedAt);
-                
-                setClients(formattedData);
-                
-                // Log the data
-                console.log(`Loaded ${formattedData.length} clients from backend`);
-            } catch (error) {
-                console.error("Error loading clients:", error);
-                
-                // Versuche, direkt Daten vom ClickUp-Endpunkt zu holen
                 try {
-                    console.log("Versuche alternative Datenfetching-Route");
-                    const alternativeResponse = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`, {
-                        credentials: 'include',
+                    console.log(`Versuche Daten zu laden von: ${endpoint.description} (${endpoint.url})`);
+                    
+                    // Spezielle Header für CORS-Probleme
+                    const response = await fetch(endpoint.url, {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'omit', // 'include' verursacht manchmal CORS-Probleme
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        mode: 'cors'
+                            'Accept': 'application/json',
+                            'Cache-Control': 'no-cache, no-store'
+                        }
                     });
-                    if (alternativeResponse.ok) {
-                        const alternativeData = await alternativeResponse.json();
-                        console.log("Alternative Daten erhalten:", alternativeData);
+                    
+                    // Prüfe Status-Code
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                    }
+                    
+                    // Parse JSON-Antwort
+                    const data = await response.json();
+                    console.log(`Daten von ${endpoint.description} erhalten:`, data);
+                    
+                    // Behandle verschiedene Datenstrukturen aus unterschiedlichen Endpunkten
+                    let formsArray;
+                    
+                    if (endpoint.url.includes('debug-forms') && data.forms) {
+                        // Debug-Endpoint-Format
+                        formsArray = data.forms;
+                    } else if (data.forms) {
+                        // Standard-API-Format
+                        formsArray = data.forms;
+                    } else if (Array.isArray(data)) {
+                        // Direktes Array
+                        formsArray = data;
+                    } else if (data.success === false) {
+                        // API meldet Fehler
+                        throw new Error(data.message || 'API returned error');
+                    } else {
+                        // Letzter Versuch, brauchbare Daten zu extrahieren
+                        console.warn('Unerwartetes Datenformat, versuche Fallbacks:', data);
                         
-                        if (alternativeData.success && alternativeData.forms && alternativeData.forms.length > 0) {
-                            // Transformiere die Daten für das Frontend
-                            const formattedData = alternativeData.forms.map(client => ({
-                                id: client.taskId || client._id,
-                                name: client.leadName,
-                                schulden: client.gesamtSchulden || "0",
-                                phase: client.phase || "erstberatung",
-                                phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
-                                qualifiziert: client.qualifiziert || false,
-                                createdAt: new Date(client.createdAt || Date.now()),
-                                updatedAt: new Date(client.updatedAt || Date.now())
-                            }));
-                            
-                            // Sortiere nach neuesten Updates
-                            formattedData.sort((a, b) => b.updatedAt - a.updatedAt);
-                            setClients(formattedData);
-                            console.log("Alternative Daten verwendet, " + formattedData.length + " Einträge geladen");
-                            return;
+                        if (data.form) {
+                            // Einzelnes Formular
+                            formsArray = [data.form];
+                        } else if (data.results && Array.isArray(data.results)) {
+                            // Ergebnisliste
+                            formsArray = data.results;
+                        } else {
+                            console.error('Konnte keine brauchbaren Daten extrahieren:', data);
+                            throw new Error('Unerwartetes Datenformat');
                         }
                     }
-                } catch (alternativeError) {
-                    console.error("Auch alternativer Abruf fehlgeschlagen:", alternativeError);
+                    
+                    // Stelle sicher, dass es ein Array ist
+                    if (!Array.isArray(formsArray)) {
+                        console.error('Extrahierte Daten sind kein Array:', formsArray);
+                        errorDetails.push(`Fehler: Daten von ${endpoint.description} sind kein Array`);
+                        continue; // Versuche den nächsten Endpoint
+                    }
+                    
+                    // Filtere ungültige Einträge
+                    formsArray = formsArray.filter(item => item && (item.taskId || item._id));
+                    
+                    if (formsArray.length === 0) {
+                        console.warn('Leeres Array erhalten, versuche nächsten Endpoint');
+                        errorDetails.push(`${endpoint.description}: Leere Ergebnisliste`);
+                        continue;
+                    }
+                    
+                    // Transform data for frontend display
+                    const formattedData = formsArray.map(client => ({
+                        id: client.taskId || client._id || `unknown-${Date.now()}`,
+                        name: client.leadName || 'Unbekannter Mandant',
+                        schulden: client.gesamtSchulden || "0",
+                        phase: client.phase || "erstberatung",
+                        phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
+                        qualifiziert: client.qualifiziert || false,
+                        createdAt: new Date(client.createdAt || Date.now()),
+                        updatedAt: new Date(client.updatedAt || Date.now())
+                    }));
+                    
+                    // Sortiere nach neuesten Updates
+                    formattedData.sort((a, b) => b.updatedAt - a.updatedAt);
+                    
+                    setClients(formattedData);
+                    success = true;
+                    
+                    console.log(`Erfolgreich geladen: ${formattedData.length} Mandanten von ${endpoint.description}`);
+                    
+                } catch (error) {
+                    console.error(`Fehler beim Laden von ${endpoint.description}:`, error);
+                    errorDetails.push(`${endpoint.description}: ${error.message}`);
+                    
+                    // Weiter mit dem nächsten Endpoint
+                    continue;
                 }
-                
-                // Nur wenn beide Methoden fehlschlagen, zeige einen Fehler
-                setClients([]);
-                alert("Fehler beim Laden der Daten. Bitte aktualisieren Sie die Seite oder kontaktieren Sie den Support.");
-            } finally {
-                setIsLoading(false);
             }
+            
+            // Wenn kein Endpoint erfolgreich war
+            if (!success) {
+                console.error("Alle API-Endpunkte fehlgeschlagen:", errorDetails);
+                
+                // Setze einen leeren Array und zeige eine Fehlermeldung
+                setClients([]);
+                
+                // Zeige detaillierte Fehlermeldung
+                alert(`Fehler beim Laden der Daten: ${errorDetails.join('; ')}`);
+            }
+            
+            // Lade-Status beenden
+            setIsLoading(false);
         };
         
         fetchClients();

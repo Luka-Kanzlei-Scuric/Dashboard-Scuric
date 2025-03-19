@@ -15,38 +15,47 @@ const connectDB = require('./config/db');
 // Express app initialisieren
 const app = express();
 
+// Body Parser Middleware muss vor CORS stehen
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
 // Serve static files from the public directory
 app.use(express.static('public'));
 
-//Middleware
-// Verbesserte CORS-Konfiguration
+//Middleware - CORS aktivieren für alle Anfragen
 app.use((req, res, next) => {
-    // Zulässige Ursprünge definieren
+    const origin = req.headers.origin;
     const allowedOrigins = [
         'https://formular-mitarbeiter.vercel.app',
-        'https://dashboard-scuric.vercel.app',
+        'https://dashboard-scuric.vercel.app', 
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:4173',
+        undefined
     ];
     
-    // Ursprung aus dem Header auslesen
-    const origin = req.headers.origin;
-    
-    // Header setzen, wenn der Ursprung in den erlaubten Ursprüngen ist oder für alle Ursprünge
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    // Im Development-Modus alle Origins erlauben
+    if (process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
         res.header('Access-Control-Allow-Origin', origin || '*');
-        res.header('Access-Control-Allow-Credentials', 'true');
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    } else {
+        // In Produktion nur erlaubte Origins
+        if (allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+        } else {
+            // Log ungültige Anfrage
+            console.warn(`CORS-Anfrage von nicht erlaubter Origin blockiert: ${origin}`);
+        }
     }
     
-    // CORS-Preflight-Anfrage beantworten
+    // Weitere CORS-Header für alle Anfragen
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
     
-    // Normale Anfrage weiterleiten
     next();
 });
 
@@ -62,10 +71,6 @@ app.use((req, res, next) => {
         console.warn('⚠️ Server läuft ohne Datenbankverbindung');
     }
 })();
-
-// Body Parser Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
 // Configure session middleware (required for OAuth)
 app.use(session({
