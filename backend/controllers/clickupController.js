@@ -1,7 +1,11 @@
 // backend/controllers/clickupController.js
 const Form = require('../models/Form');
-const { addLog, transformClickUpData } = require('../routes/makeRoutes');
+const makeRoutes = require('../routes/makeRoutes');
 const clickupUtils = require('../utils/clickupUtils');
+
+// Importiere die benötigten Funktionen aus makeRoutes
+const addLog = makeRoutes.addLog;
+const transformClickUpData = makeRoutes.transformClickUpData;
 
 // Map dashboard phases to ClickUp statuses
 const mapPhaseToClickUpStatus = clickupUtils.mapPhaseToClickUpStatus;
