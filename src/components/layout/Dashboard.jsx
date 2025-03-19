@@ -53,6 +53,31 @@ const Dashboard = ({ children }) => {
         navigate('/');
     };
     
+    // Debug-Funktion, um direkt die Daten aus dem Backend abzurufen
+    const debugFetchData = async () => {
+        try {
+            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://privatinsolvenz-backend.onrender.com';
+            const response = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`);
+            if (response.ok) {
+                const data = await response.json();
+                console.log("Direkte Daten aus der Datenbank:", data);
+                
+                if (data.forms && data.forms.length > 0) {
+                    alert(`Daten gefunden! ${data.forms.length} Einträge in der Datenbank.\n` + 
+                          `Erster Eintrag: ${data.forms[0].leadName} (${data.forms[0].taskId})\n` +
+                          `Alle Details im Konsolenfenster.`);
+                } else {
+                    alert("Keine Daten in der Datenbank gefunden.");
+                }
+            } else {
+                alert("Fehler beim Abrufen der Debug-Daten");
+            }
+        } catch (error) {
+            console.error("Debug-Abruf fehlgeschlagen:", error);
+            alert("Debug-Abruf fehlgeschlagen: " + error.message);
+        }
+    };
+    
     // Sync all forms with ClickUp
     const handleSyncAll = async () => {
         if (isSyncing) return;
@@ -177,6 +202,17 @@ const Dashboard = ({ children }) => {
                     </ul>
                     
                     <div className="px-4 py-2 mt-4 text-xs text-gray-600 uppercase">Phasen</div>
+                    
+                    {/* Debug-Button - Nach Debugging entfernen */}
+                    <div className="px-4 py-2">
+                        <button 
+                            onClick={debugFetchData}
+                            className="text-xs bg-purple-100 text-purple-800 p-1 rounded"
+                        >
+                            DB Check
+                        </button>
+                    </div>
+                    
                     <ul>
                         <li>
                             <button

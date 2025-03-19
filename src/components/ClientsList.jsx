@@ -100,22 +100,41 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
             } catch (error) {
                 console.error("Error loading clients:", error);
                 
-                // Fallback to mock data for testing
-                console.log("Using mock client data due to error");
-                const mockData = [
-                    { 
-                        id: "MOCK001", 
-                        name: "Max Mustermann", 
-                        schulden: "25000", 
-                        phase: "erstberatung",
-                        phaseStatus: "Neue Anfrage",
-                        qualifiziert: true,
-                        createdAt: new Date('2024-02-01'),
-                        updatedAt: new Date('2024-02-01')
+                // Versuche, direkt Daten vom ClickUp-Endpunkt zu holen
+                try {
+                    console.log("Versuche alternative Datenfetching-Route");
+                    const alternativeResponse = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`);
+                    if (alternativeResponse.ok) {
+                        const alternativeData = await alternativeResponse.json();
+                        console.log("Alternative Daten erhalten:", alternativeData);
+                        
+                        if (alternativeData.success && alternativeData.forms && alternativeData.forms.length > 0) {
+                            // Transformiere die Daten für das Frontend
+                            const formattedData = alternativeData.forms.map(client => ({
+                                id: client.taskId || client._id,
+                                name: client.leadName,
+                                schulden: client.gesamtSchulden || "0",
+                                phase: client.phase || "erstberatung",
+                                phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
+                                qualifiziert: client.qualifiziert || false,
+                                createdAt: new Date(client.createdAt || Date.now()),
+                                updatedAt: new Date(client.updatedAt || Date.now())
+                            }));
+                            
+                            // Sortiere nach neuesten Updates
+                            formattedData.sort((a, b) => b.updatedAt - a.updatedAt);
+                            setClients(formattedData);
+                            console.log("Alternative Daten verwendet, " + formattedData.length + " Einträge geladen");
+                            return;
+                        }
                     }
-                ];
+                } catch (alternativeError) {
+                    console.error("Auch alternativer Abruf fehlgeschlagen:", alternativeError);
+                }
                 
-                setClients(mockData);
+                // Nur wenn beide Methoden fehlschlagen, zeige einen Fehler
+                setClients([]);
+                alert("Fehler beim Laden der Daten. Bitte aktualisieren Sie die Seite oder kontaktieren Sie den Support.");
             } finally {
                 setIsLoading(false);
             }

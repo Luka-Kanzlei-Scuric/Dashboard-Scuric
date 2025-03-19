@@ -258,11 +258,42 @@ exports.handleMakeWebhook = async (req, res) => {
     // Transform task data using the utility function
     const transformedData = transformClickUpData(taskData);
     
+    // Log das transformierte Objekt für Debugging
+    console.log('TRANSFORMED CLICKUP DATA:', JSON.stringify(transformedData, null, 2));
+    
     addLog('info', 'Transformed task data', { 
       taskId: transformedData.taskId,
       leadName: transformedData.leadName,
       phase: transformedData.phase
     }, 'ClickUp Controller');
+    
+    // Validierung der transformierten Daten
+    if (!transformedData.taskId) {
+      addLog('error', 'Transformation fehlgeschlagen - keine taskId', {
+        originalData: taskData
+      }, 'ClickUp Controller');
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Transformation fehlgeschlagen - keine taskId'
+      });
+    }
+    
+    // Stelle sicher, dass der lead-Name nicht leer ist
+    if (!transformedData.leadName || transformedData.leadName === 'Unbekannter Mandant') {
+      // Versuche einen Namen aus anderen Quellen zu extrahieren
+      if (taskData.content && typeof taskData.content === 'string') {
+        const nameMatch = taskData.content.match(/Name\s*:\s*([^\n]+)/i);
+        if (nameMatch && nameMatch[1]) {
+          transformedData.leadName = nameMatch[1].trim();
+        }
+      }
+      
+      // Wenn immer noch kein Name, verwende einen aussagekräftigeren Namen
+      if (!transformedData.leadName || transformedData.leadName === 'Unbekannter Mandant') {
+        transformedData.leadName = `Neu: Task ${transformedData.taskId.substring(0, 8)}`;
+      }
+    }
     
     // Check if the task already exists in our database
     let form = await Form.findOne({ taskId: transformedData.taskId });

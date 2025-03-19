@@ -212,58 +212,21 @@ exports.getAllForms = async (req, res) => {
         } catch (dbError) {
             console.error("Database error:", dbError);
             
-            // If database error occurs, return test data for demo purposes
-            const testForms = [
-                {
-                    taskId: "TEST001",
-                    leadName: "Test Mandant",
-                    phase: "erstberatung",
-                    qualifiziert: false,
-                    glaeubiger: "3",
-                    gesamtSchulden: "15000",
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                }
-            ];
-            
-            console.log("Returning test data due to DB error");
-            res.json({
-                forms: testForms,
-                pagination: {
-                    total: 1,
-                    page: 1,
-                    limit: 20,
-                    pages: 1
-                },
-                testData: true
+            // Gib leere Liste zurück anstatt Test-Daten
+            console.log("Fehler bei der Datenbankabfrage - Leere Liste zurückgeben");
+            res.status(500).json({
+                success: false,
+                message: 'Fehler bei der Datenbankabfrage',
+                error: dbError.message
             });
         }
     } catch (error) {
         console.error("❌ Fehler in getAllForms:", error.stack);
         
-        // Even on error, return test data instead of error for demo purposes
-        const testForms = [
-            {
-                taskId: "ERROR001",
-                leadName: "Test Mandant (Error Fallback)",
-                phase: "erstberatung",
-                qualifiziert: false,
-                glaeubiger: "3",
-                gesamtSchulden: "15000",
-                createdAt: new Date(),
-                updatedAt: new Date()
-            }
-        ];
-        
-        res.json({
-            forms: testForms,
-            pagination: {
-                total: 1,
-                page: 1, 
-                limit: 20,
-                pages: 1
-            },
-            testData: true,
+        // Bei allgemeinem Fehler ebenfalls Fehlermeldung
+        res.status(500).json({
+            success: false, 
+            message: "Fehler beim Laden der Mandanten",
             error: error.message
         });
     }
