@@ -11,13 +11,15 @@ router.post('/make-webhook', clickupController.handleMakeWebhook);
 // DEBUG-ONLY: Get all forms in database
 router.get('/debug-forms', async (req, res) => {
   try {
-    const forms = await Form.find().select('taskId leadName phase qualifiziert updatedAt');
+    const forms = await Form.find().select('taskId leadName phase qualifiziert updatedAt createdAt gesamtSchulden');
     console.log('Debug forms:', forms);
     
     addLog('info', 'DEBUG: Alle Forms abgerufen', {
       count: forms.length,
       forms: forms.map(f => ({id: f.taskId, name: f.leadName}))
     }, 'Debug Route');
+    
+    // CORS-Header werden bereits durch Middleware gesetzt
     
     res.json({
       success: true,

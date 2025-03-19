@@ -46,7 +46,14 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
             try {
                 console.log("Fetching clients from:", `${BACKEND_URL}/api/forms`);
                 
-                const response = await fetch(`${BACKEND_URL}/api/forms`);
+                const response = await fetch(`${BACKEND_URL}/api/forms`, {
+                    credentials: 'include', 
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors'
+                });
                 if (!response.ok) {
                     throw new Error('Failed to fetch clients');
                 }
@@ -103,7 +110,14 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                 // Versuche, direkt Daten vom ClickUp-Endpunkt zu holen
                 try {
                     console.log("Versuche alternative Datenfetching-Route");
-                    const alternativeResponse = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`);
+                    const alternativeResponse = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`, {
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        mode: 'cors'
+                    });
                     if (alternativeResponse.ok) {
                         const alternativeData = await alternativeResponse.json();
                         console.log("Alternative Daten erhalten:", alternativeData);

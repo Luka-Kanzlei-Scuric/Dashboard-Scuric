@@ -19,20 +19,36 @@ const app = express();
 app.use(express.static('public'));
 
 //Middleware
-app.use(cors({
-    origin: [
+// Verbesserte CORS-Konfiguration
+app.use((req, res, next) => {
+    // Zulässige Ursprünge definieren
+    const allowedOrigins = [
         'https://formular-mitarbeiter.vercel.app',
+        'https://dashboard-scuric.vercel.app',
         'http://localhost:3000',
         'http://localhost:5173',
-        'http://localhost:4173', // Preview-Modus von Vite
-        'https://dashboard-scuric.vercel.app', // Vercel Frontend URL
-        process.env.CORS_ORIGIN,
-        '*' // Temporär alle Origins erlauben
-    ].filter(Boolean),
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
+        'http://localhost:4173',
+    ];
+    
+    // Ursprung aus dem Header auslesen
+    const origin = req.headers.origin;
+    
+    // Header setzen, wenn der Ursprung in den erlaubten Ursprüngen ist oder für alle Ursprünge
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        res.header('Access-Control-Allow-Origin', origin || '*');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    }
+    
+    // CORS-Preflight-Anfrage beantworten
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    // Normale Anfrage weiterleiten
+    next();
+});
 
 // Connect to MongoDB
 (async () => {
@@ -94,10 +110,7 @@ app.get('/api/logs', (req, res) => {
         const makeRoutes = require('./routes/makeRoutes');
         const logs = makeRoutes.getLogs ? makeRoutes.getLogs() : [];
         
-        // CORS-Header explizit setzen
-        res.header('Access-Control-Allow-Origin', '*');
-        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type');
+        // CORS-Header werden bereits durch Middleware gesetzt
         
         res.json({
             success: true,

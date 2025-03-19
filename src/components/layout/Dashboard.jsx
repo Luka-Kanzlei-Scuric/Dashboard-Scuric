@@ -57,7 +57,14 @@ const Dashboard = ({ children }) => {
     const debugFetchData = async () => {
         try {
             const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://privatinsolvenz-backend.onrender.com';
-            const response = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`);
+            const response = await fetch(`${BACKEND_URL}/api/clickup/debug-forms`, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'
+            });
             if (response.ok) {
                 const data = await response.json();
                 console.log("Direkte Daten aus der Datenbank:", data);

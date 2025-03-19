@@ -172,10 +172,7 @@ module.exports.getLogs = () => logs;
 
 // Logs abrufen
 router.get('/logs', (req, res) => {
-  // CORS-Header explizit setzen
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  // CORS-Header werden bereits durch Middleware gesetzt
   
   try {
     // Debug-Ausgabe
