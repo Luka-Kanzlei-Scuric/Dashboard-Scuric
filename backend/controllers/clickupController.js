@@ -6,7 +6,8 @@ const clickupUtils = require('../utils/clickupUtils');
 const mapPhaseToClickUpStatus = clickupUtils.mapPhaseToClickUpStatus;
 
 // Implementiere die transformClickUpData Funktion direkt im Controller
-function transformClickUpData(clickupTask) {
+// und exportiere sie, damit andere Module sie verwenden können
+exports.transformClickUpData = function transformClickUpData(clickupTask) {
   console.log('Transforming ClickUp task data:', JSON.stringify(clickupTask, null, 2));
   
   try {
@@ -156,8 +157,9 @@ function transformClickUpData(clickupTask) {
     
     // Suche nach der ersten gültigen ID
     for (const field of idFields) {
-      if (clickupTask[field] && typeof clickupTask[field] === 'string') {
-        taskId = clickupTask[field];
+      if (clickupTask[field]) {
+        // Konvertiere zu String, falls es eine Zahl oder ein anderer Typ ist
+        taskId = String(clickupTask[field]);
         break;
       }
     }
@@ -267,6 +269,28 @@ function transformClickUpData(clickupTask) {
       }
     }
     
+    // Telefonnummer extrahieren
+    let telefon = '';
+    const phoneFields = ['telefon', 'phone', 'mobile', 'tel', 'telephone', 'phonenumber'];
+    
+    // Suche in Hauptdaten
+    for (const field of phoneFields) {
+      if (clickupTask[field]) {
+        telefon = clickupTask[field];
+        break;
+      }
+    }
+    
+    // Suche in benutzerdefinierten Feldern
+    if (!telefon) {
+      for (const field of phoneFields) {
+        if (customFields[field]) {
+          telefon = customFields[field];
+          break;
+        }
+      }
+    }
+    
     // Erstelle das transformierte Objekt
     const transformedData = {
       taskId: taskId,
@@ -280,7 +304,7 @@ function transformClickUpData(clickupTask) {
       plz: customFields['PLZ'] || customFields['Postleitzahl'] || customFields['plz'] || customFields['zip'] || '',
       wohnort: customFields['Ort'] || customFields['Stadt'] || customFields['Wohnort'] || customFields['city'] || customFields['ort'] || '',
       email: email,
-      telefon: customFields['Telefonnummer'] || customFields['Telefon'] || customFields['Tel'] || customFields['phone'] || customFields['telefon'] || '',
+      telefon: telefon || customFields['Telefonnummer'] || customFields['Telefon'] || customFields['Tel'] || customFields['phone'] || '',
       
       // Finanzielle Daten (optional)
       gesamtSchulden: customFields['Gesamtschulden'] || customFields['Schulden'] || customFields['schulden'] || customFields['debt'] || '0',
@@ -354,16 +378,24 @@ function isQualified(status) {
   return qualifiedStatuses.includes(status);
 }
 
+// Definiere eine Fallback-Logfunktion
+function fallbackLog(type, message, details = null, source = 'System') {
+  console.log(`[${type.toUpperCase()}] [${source}] ${message}`, details ? JSON.stringify(details) : '');
+}
+
 // Process Make.com webhook for ClickUp tasks
 exports.handleMakeWebhook = async (req, res) => {
   // Load logging system if available
-  let addLog;
+  let addLog = fallbackLog;
   try {
     const makeRoutes = require('../routes/makeRoutes');
-    addLog = makeRoutes.addLog;
+    if (typeof makeRoutes.addLog === 'function') {
+      addLog = makeRoutes.addLog;
+    } else {
+      console.log('makeRoutes.addLog is not a function, using fallback logger');
+    }
   } catch (e) {
     console.log('Logging system not available:', e.message);
-    addLog = (...args) => console.log(...args);
   }
   
   try {

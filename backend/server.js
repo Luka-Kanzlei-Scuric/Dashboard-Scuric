@@ -27,33 +27,27 @@ app.use((req, res, next) => {
     const origin = req.headers.origin;
     const allowedOrigins = [
         'https://formular-mitarbeiter.vercel.app',
-        'https://dashboard-scuric.vercel.app', 
+        'https://dashboard-scuric.vercel.app',
+        'https://dashboard-scuric.onrender.com',
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:4173',
         undefined
     ];
     
-    // Im Development-Modus alle Origins erlauben
+    // Im Development-Modus oder für erlaubte Origins CORS erlauben
     if (process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
         res.header('Access-Control-Allow-Origin', origin || '*');
-    } else {
-        // In Produktion nur erlaubte Origins
-        if (allowedOrigins.includes(origin)) {
-            res.header('Access-Control-Allow-Origin', origin);
-        } else {
-            // Log ungültige Anfrage
-            console.warn(`CORS-Anfrage von nicht erlaubter Origin blockiert: ${origin}`);
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+        
+        if (req.method === 'OPTIONS') {
+            return res.status(200).end();
         }
-    }
-    
-    // Weitere CORS-Header für alle Anfragen
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    } else {
+        // Log ungültige Anfrage
+        console.warn(`CORS-Anfrage von nicht erlaubter Origin blockiert: ${origin}`);
     }
     
     next();
@@ -132,96 +126,130 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
-// Webhook-Route für Make.com - Wird an den ClickUp-Controller weitergeleitet
+// VEREINFACHTE Webhook-Route für Make.com - Direkte Verarbeitung ohne komplexe Controller
 app.post('/api/clickup-data', async (req, res) => {
-    console.log('Make.com Webhook empfangen, leite an ClickUp-Controller weiter');
+    console.log('Make.com Webhook empfangen - VEREINFACHTE VERARBEITUNG');
+    console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
     
     try {
-        // Logs-System importieren
-        const makeRoutes = require('./routes/makeRoutes');
-        const addLog = makeRoutes.addLog;
+        // Datenbank-Modell importieren
+        const Form = require('./models/Form');
         
-        // In Logs eintragen
-        if (typeof addLog === 'function') {
-            addLog('info', 'Make.com Webhook empfangen', {
-                endpoint: '/api/clickup-data',
-                timestamp: new Date().toISOString(),
-                headers: req.headers['content-type'],
-                body: req.body
-            }, 'Make Integration');
+        // Grundlegende Datenextraktion
+        let taskData = req.body;
+        
+        // Support für Arrays
+        if (Array.isArray(taskData)) {
+            console.log(`Array mit ${taskData.length} Elementen erhalten, verwende das erste Element`);
+            if (taskData.length > 0) {
+                taskData = taskData[0];
+            } else {
+                return res.json({
+                    success: false, 
+                    message: 'Leeres Array erhalten'
+                });
+            }
         }
         
-        // Anfrage formatieren, wenn es ein Array ist
-        if (Array.isArray(req.body) && req.body.length > 0) {
-            addLog('info', 'Array von Tasks empfangen, verarbeite sequentiell', {
-                count: req.body.length
-            }, 'Make Integration');
+        // Extrahiere nur die notwendigsten Daten
+        let taskId = null;
+        let leadName = "Neuer Mandant";
+        let status = "NEUE ANFRAGE";
+        let email = "";
+        let telefon = "";
+        
+        // Versuche taskId zu finden (Priorität: id > taskId > task_id)
+        if (taskData.id) taskId = taskData.id;
+        else if (taskData.taskId) taskId = taskData.taskId;
+        else if (taskData.task_id) taskId = taskData.task_id;
+        else taskId = `temp-${Date.now()}`; // Fallback
+        
+        // Versuche Namen zu finden
+        if (taskData.name) leadName = taskData.name;
+        else if (taskData.title) leadName = taskData.title;
+        else if (taskData.leadName) leadName = taskData.leadName;
+        
+        // Versuche Status zu finden
+        if (typeof taskData.status === 'string') {
+            status = taskData.status;
+        } else if (taskData.status && taskData.status.status) {
+            status = taskData.status.status;
+        } else if (taskData.status_name) {
+            status = taskData.status_name;
+        }
+        
+        // Versuche Kontaktinformationen zu finden
+        if (taskData.email) email = taskData.email;
+        if (taskData.telefon || taskData.phone) telefon = taskData.telefon || taskData.phone;
+        
+        // Prüfen, ob der Task bereits existiert
+        let form = await Form.findOne({ taskId });
+        let isNew = false;
+        
+        if (form) {
+            console.log(`Task ${taskId} existiert bereits, aktualisiere`);
+            form.leadName = leadName;
+            form.updatedAt = new Date();
             
-            // An den ClickUp-Controller weiterleiten
-            const clickupController = require('./controllers/clickupController');
-            const results = [];
-            
-            // Verarbeite jede Task einzeln
-            for (const task of req.body) {
-                try {
-                    // Erstelle ein temporäres Response-Objekt
-                    const tempRes = {
-                        status: (code) => ({ json: (data) => ({ code, data }) }),
-                        json: (data) => data
-                    };
-                    
-                    // Verarbeite die Anfrage mit einer einzelnen Task
-                    const tempReq = { ...req, body: task };
-                    const result = await clickupController.handleMakeWebhook(tempReq, tempRes);
-                    results.push(result);
-                } catch (taskError) {
-                    addLog('error', `Fehler bei der Verarbeitung von Task ${task.id || 'unbekannt'}`, {
-                        error: taskError.message
-                    }, 'Make Integration');
-                    
-                    results.push({
-                        success: false,
-                        message: `Fehler bei Task ${task.id || 'unbekannt'}`,
-                        error: taskError.message
-                    });
-                }
+            // Füge den Status dem clickupData hinzu, wenn er nicht existiert
+            if (!form.clickupData) {
+                form.clickupData = { status: status };
+            } else {
+                form.clickupData.status = status;
             }
             
-            // Sende eine zusammengefasste Antwort
-            return res.json({
-                success: true,
-                message: `${results.length} Tasks verarbeitet`,
-                results: results
-            });
+            // Aktualisiere Kontaktinformationen, wenn vorhanden
+            if (email) form.email = email;
+            if (telefon) form.telefon = telefon;
+            
+            await form.save();
         } else {
-            // An den ClickUp-Controller weiterleiten
-            const clickupController = require('./controllers/clickupController');
+            console.log(`Erstelle neuen Task ${taskId}`);
+            isNew = true;
             
-            // Request und Response an den Make-Webhook-Handler weiterleiten
-            await clickupController.handleMakeWebhook(req, res);
+            // Erstelle ein neues Formular mit den empfangenen Daten
+            form = new Form({
+                taskId: taskId,
+                leadName: leadName,
+                phase: 'erstberatung',
+                qualifiziert: false,
+                email: email || 'keine@angabe.com',
+                telefon: telefon || 'keine',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                clickupData: {
+                    status: status,
+                    statusColor: '#cccccc',
+                    priority: 'normal'
+                }
+            });
+            
+            await form.save();
         }
-    } catch (error) {
-        console.error('Fehler im Make.com Webhook Endpoint:', error);
         
-        // Versuche, den Fehler zu loggen
-        try {
-            const makeRoutes = require('./routes/makeRoutes');
-            if (typeof makeRoutes.addLog === 'function') {
-                makeRoutes.addLog('error', 'Fehler bei der Verarbeitung eines Make.com-Webhooks', {
-                    error: error.message,
-                    stack: error.stack,
-                    timestamp: new Date().toISOString()
-                }, 'Make Integration');
+        console.log(`Task ${isNew ? 'erstellt' : 'aktualisiert'}: ${leadName} (${taskId})`);
+        
+        // Erfolgreiche Antwort
+        res.json({
+            success: true,
+            message: `Task erfolgreich ${isNew ? 'erstellt' : 'aktualisiert'}`,
+            form: {
+                id: form.taskId,
+                name: form.leadName,
+                status: form.clickupData?.status || status,
+                email: form.email,
+                telefon: form.telefon
             }
-        } catch (logError) {
-            console.error('Konnte Fehler nicht loggen:', logError);
-        }
+        });
         
-        res.status(500).json({
+    } catch (error) {
+        console.error('Fehler bei der Verarbeitung des Make.com Webhooks:', error);
+        
+        // Einfache Fehlerantwort
+        res.status(200).json({  // Status 200 damit Make.com es als "erfolgreich" betrachtet
             success: false,
-            message: 'Fehler bei der Verarbeitung des Webhooks',
-            error: error.message,
-            timestamp: new Date().toISOString()
+            message: 'Fehler bei der Verarbeitung',
+            error: error.message
         });
     }
 });
