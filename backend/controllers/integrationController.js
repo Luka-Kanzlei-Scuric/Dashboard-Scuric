@@ -1,7 +1,8 @@
 // backend/controllers/integrationController.js
 const Form = require('../models/Form');
 const clickupUtils = require('../utils/clickupUtils');
-const { addLog, transformClickUpData } = require('../routes/makeRoutes');
+const { addLog } = require('../routes/makeRoutes');
+const { transformClickUpData } = require('./clickupController');
 
 // Handle incoming webhooks from Make.com
 exports.handleMakeWebhook = async (req, res) => {

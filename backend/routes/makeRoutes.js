@@ -2,6 +2,35 @@ const express = require('express');
 const router = express.Router();
 const Form = require('../models/Form');
 
+// Log-System für das Dashboard
+const logs = [];
+const MAX_LOGS = 100;
+
+// Log-Funktion
+function addLog(type, message, details = null, source = 'System') {
+  const logEntry = {
+    type: type, // 'success', 'error', 'info', 'warning'
+    message,
+    details,
+    source,
+    timestamp: new Date()
+  };
+  
+  logs.unshift(logEntry); // Neue Logs am Anfang hinzufügen
+  
+  // Maximale Anzahl an Logs begrenzen
+  if (logs.length > MAX_LOGS) {
+    logs.pop();
+  }
+  
+  console.log(`[${type.toUpperCase()}] ${message}`);
+  return logEntry;
+}
+
+// Exportiere Funktionen für andere Module
+module.exports.addLog = addLog;
+module.exports.getLogs = () => logs;
+
 // Empfange Rohdaten und verarbeite sie im Backend
 // Hauptroute ohne Pfad
 router.post('/', async (req, res) => {
@@ -141,35 +170,6 @@ router.post('/debug', (req, res) => {
   });
 });
 
-// Log-System für das Dashboard
-const logs = [];
-const MAX_LOGS = 100;
-
-// Log-Funktion
-function addLog(type, message, details = null, source = 'System') {
-  const logEntry = {
-    type: type, // 'success', 'error', 'info', 'warning'
-    message,
-    details,
-    source,
-    timestamp: new Date()
-  };
-  
-  logs.unshift(logEntry); // Neue Logs am Anfang hinzufügen
-  
-  // Maximale Anzahl an Logs begrenzen
-  if (logs.length > MAX_LOGS) {
-    logs.pop();
-  }
-  
-  console.log(`[${type.toUpperCase()}] ${message}`);
-  return logEntry;
-}
-
-// Exportiere Funktionen für andere Module
-module.exports.addLog = addLog;
-module.exports.getLogs = () => logs;
-
 // Logs abrufen
 router.get('/logs', (req, res) => {
   // CORS-Header werden bereits durch Middleware gesetzt
@@ -195,111 +195,8 @@ router.get('/logs', (req, res) => {
 
 // Produktionsbereit - Testroute entfernt
 
-// Hilfsfunktion zur Transformation der ClickUp-Daten in das gewünschte Format
-function transformClickUpData(clickupTask) {
-  // Extrahiere benutzerdefinierte Felder (für einfacheren Zugriff)
-  const customFields = {};
-  if (Array.isArray(clickupTask.custom_fields)) {
-    clickupTask.custom_fields.forEach(field => {
-      customFields[field.name] = field.value;
-    });
-  }
-  
-  // Ermittle Phase basierend auf Status
-  const phase = mapStatusToPhase(clickupTask.status);
-  
-  // Behandle die Daten
-  let createdAtDate = new Date();
-  let updatedAtDate = new Date();
-  
-  try {
-    if (clickupTask.date_created) {
-      createdAtDate = new Date(parseInt(clickupTask.date_created));
-    }
-  } catch (e) {
-    console.log('Fehler beim Parsen des Erstellungsdatums:', e);
-  }
-  
-  try {
-    if (clickupTask.date_updated) {
-      updatedAtDate = new Date(parseInt(clickupTask.date_updated));
-    }
-  } catch (e) {
-    console.log('Fehler beim Parsen des Aktualisierungsdatums:', e);
-  }
-  
-  // Stelle sicher, dass taskId und leadName gültige Werte haben
-  const taskId = clickupTask.id || `fallback-${Date.now()}`;
-  const leadName = clickupTask.name || 'Unbekannter Mandant';
-  
-  // Erstelle das transformierte Objekt
-  return {
-    taskId: taskId,
-    leadName: leadName,
-    phase: phase,
-    qualifiziert: isQualified(clickupTask.status),
-    
-    // Kontaktinformationen (aus benutzerdefinierten Feldern)
-    strasse: customFields['Straße'] || '',
-    hausnummer: customFields['Hausnummer'] || '',
-    plz: customFields['PLZ'] || '',
-    wohnort: customFields['Ort'] || '',
-    email: customFields['Email'] || '',
-    telefon: customFields['Telefonnummer'] || '',
-    
-    // Finanzielle Daten (optional)
-    gesamtSchulden: customFields['Gesamtschulden'] || '0',
-    glaeubiger: customFields['Gläubiger Anzahl'] || '0',
-    
-    // Metadaten
-    createdAt: createdAtDate,
-    updatedAt: updatedAtDate,
-    
-    // ClickUp-spezifische Daten (für die Referenz)
-    clickupData: {
-      status: clickupTask.status || 'Unbekannt',
-      statusColor: clickupTask.status_color || '#cccccc',
-      priority: clickupTask.priority || 'normal'
-    }
-  };
-}
-
-// Status-zu-Phase Mapping
-function mapStatusToPhase(status) {
-  const statusMap = {
-    'NEUE ANFRAGE': 'erstberatung',
-    'VERSUCHT ZU ERREICHEN 1': 'erstberatung',
-    'VERSUCHT ZU ERREICHEN 2': 'erstberatung',
-    'VERSUCHT ZU ERREICHEN 3': 'erstberatung',
-    'VERSUCHT ZU ERREICHEN 4': 'erstberatung',
-    'VERSUCHT ZU ERREICHEN 5': 'erstberatung',
-    'AUF TERMIN': 'erstberatung',
-    'ANWALT': 'checkliste',
-    'ANFRAGE MELDET SICH SELBST': 'erstberatung',
-    'ANFRAGE NIE ERREICHT': 'erstberatung',
-    'FALSCHE NUMMER': 'erstberatung',
-    'UNQUALIFIZIERT - ARCHIV': 'erstberatung',
-    'QUALIFIZIERT': 'checkliste',
-    'ANGEBOTSZUSTELLUNG': 'checkliste',
-    'ANGEBOT UNTERSCHRIEBEN': 'dokumente'
-  };
-  
-  return statusMap[status] || 'erstberatung';
-}
-
-// Bestimme, ob ein Task qualifiziert ist
-function isQualified(status) {
-  const qualifiedStatuses = [
-    'QUALIFIZIERT',
-    'ANGEBOTSZUSTELLUNG',
-    'ANGEBOT UNTERSCHRIEBEN',
-    'ANWALT'
-  ];
-  
-  return qualifiedStatuses.includes(status);
-}
-
-// Exportiere transformClickUpData für andere Module
-module.exports.transformClickUpData = transformClickUpData;
+// Importiere die Funktionen aus dem Controller
+// Um Zirkularreferenzen zu vermeiden, exportieren wir die transformClickUpData Funktion nicht mehr aus makeRoutes
+// Stattdessen nutzen wir die Version aus dem Controller
 
 module.exports = router;

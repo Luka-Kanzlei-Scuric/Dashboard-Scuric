@@ -39,7 +39,7 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
         setRefreshTrigger(prev => prev + 1);
     };
     
-    // Load clients from API with multiple fallback mechanisms
+    // Load clients from API with simplified approach
     useEffect(() => {
         const fetchClients = async () => {
             setIsLoading(true);
@@ -47,16 +47,16 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
             // Array von APIs, die wir in Reihenfolge versuchen werden
             const apiEndpoints = [
                 {
+                    url: `${BACKEND_URL}/api/clickup/debug-forms`, // Hauptendpunkt ist jetzt debug-forms
+                    description: 'Debug API-Endpunkt'
+                },
+                {
                     url: `${BACKEND_URL}/api/forms`,
                     description: 'Standard API-Endpunkt'
                 },
                 {
-                    url: `${BACKEND_URL}/api/clickup/debug-forms`,
-                    description: 'Alternative Debug-API'
-                },
-                {
-                    url: `${BACKEND_URL}/api/integrations/status`,
-                    description: 'Integrations-Status-API (nur zur Konnektivitätsprüfung)'
+                    url: `${BACKEND_URL}/api/clickup/leads`, // Als Fallback die ClickUp-Leads verwenden
+                    description: 'ClickUp-Leads API'
                 }
             ];
             
@@ -92,63 +92,69 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                     const data = await response.json();
                     console.log(`Daten von ${endpoint.description} erhalten:`, data);
                     
-                    // Behandle verschiedene Datenstrukturen aus unterschiedlichen Endpunkten
-                    let formsArray;
+                    // Extrahiere Daten basierend auf dem Endpunkt
+                    let formsArray = [];
                     
                     if (endpoint.url.includes('debug-forms') && data.forms) {
-                        // Debug-Endpoint-Format
+                        // Debug-Forms Endpoint
                         formsArray = data.forms;
+                    } else if (endpoint.url.includes('clickup/leads') && data.tasks) {
+                        // ClickUp Leads Endpoint (Konvertiere zu Formular-Format)
+                        formsArray = data.tasks.map(task => ({
+                            taskId: task.id,
+                            leadName: task.name,
+                            phase: task.phase || "erstberatung",
+                            gesamtSchulden: task.schulden || "0",
+                            glaeubiger: task.glaeubiger || "0",
+                            qualifiziert: task.status === "QUALIFIZIERT" || false,
+                            createdAt: task.dateCreated,
+                            updatedAt: task.dateUpdated,
+                            clickupData: {
+                                status: task.status || "Neu"
+                            }
+                        }));
                     } else if (data.forms) {
-                        // Standard-API-Format
+                        // Standard-API mit forms Array
                         formsArray = data.forms;
                     } else if (Array.isArray(data)) {
                         // Direktes Array
                         formsArray = data;
-                    } else if (data.success === false) {
-                        // API meldet Fehler
-                        throw new Error(data.message || 'API returned error');
                     } else {
-                        // Letzter Versuch, brauchbare Daten zu extrahieren
-                        console.warn('Unerwartetes Datenformat, versuche Fallbacks:', data);
-                        
-                        if (data.form) {
-                            // Einzelnes Formular
-                            formsArray = [data.form];
-                        } else if (data.results && Array.isArray(data.results)) {
-                            // Ergebnisliste
+                        // Extrahiere sonstige Daten, wenn möglich
+                        if (data.results && Array.isArray(data.results)) {
                             formsArray = data.results;
+                        } else if (data.form) {
+                            formsArray = [data.form];
                         } else {
-                            console.error('Konnte keine brauchbaren Daten extrahieren:', data);
-                            throw new Error('Unerwartetes Datenformat');
+                            console.warn('Unbekanntes Datenformat, überspringe:', data);
+                            continue; // Versuche nächsten Endpoint
                         }
                     }
                     
-                    // Stelle sicher, dass es ein Array ist
+                    // Filtere und prüfe die Daten
                     if (!Array.isArray(formsArray)) {
                         console.error('Extrahierte Daten sind kein Array:', formsArray);
-                        errorDetails.push(`Fehler: Daten von ${endpoint.description} sind kein Array`);
-                        continue; // Versuche den nächsten Endpoint
-                    }
-                    
-                    // Filtere ungültige Einträge
-                    formsArray = formsArray.filter(item => item && (item.taskId || item._id));
-                    
-                    if (formsArray.length === 0) {
-                        console.warn('Leeres Array erhalten, versuche nächsten Endpoint');
-                        errorDetails.push(`${endpoint.description}: Leere Ergebnisliste`);
                         continue;
                     }
                     
-                    // Transform data for frontend display
+                    // Filtere ungültige Einträge
+                    formsArray = formsArray.filter(item => item && (item.taskId || item._id || item.id));
+                    
+                    if (formsArray.length === 0) {
+                        console.warn('Leeres Array erhalten, versuche nächsten Endpoint');
+                        continue;
+                    }
+                    
+                    // Transform data for frontend display with robust mapping
                     const formattedData = formsArray.map(client => ({
-                        id: client.taskId || client._id || `unknown-${Date.now()}`,
-                        name: client.leadName || 'Unbekannter Mandant',
-                        schulden: client.gesamtSchulden || "0",
+                        id: client.taskId || client.id || client._id || `unknown-${Date.now()}`,
+                        name: client.leadName || client.name || 'Unbekannter Mandant',
+                        schulden: client.gesamtSchulden || client.schulden || "0",
                         phase: client.phase || "erstberatung",
-                        phaseStatus: client.clickupData?.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
+                        phaseStatus: client.clickupData?.status || client.status || (client.qualifiziert ? "Qualifiziert" : "In Prüfung"),
                         qualifiziert: client.qualifiziert || false,
-                        createdAt: new Date(client.createdAt || Date.now()),
-                        updatedAt: new Date(client.updatedAt || Date.now())
+                        createdAt: new Date(client.createdAt || client.dateCreated || Date.now()),
+                        updatedAt: new Date(client.updatedAt || client.dateUpdated || Date.now())
                     }));
                     
                     // Sortiere nach neuesten Updates
@@ -175,8 +181,8 @@ const ClientsList = ({ phase = null, teamMode = null }) => {
                 // Setze einen leeren Array und zeige eine Fehlermeldung
                 setClients([]);
                 
-                // Zeige detaillierte Fehlermeldung
-                alert(`Fehler beim Laden der Daten: ${errorDetails.join('; ')}`);
+                // Zeige detaillierte Fehlermeldung (aber nicht als alert, weil das nervig ist)
+                console.error(`Fehler beim Laden der Daten: ${errorDetails.join('; ')}`);
             }
             
             // Lade-Status beenden
