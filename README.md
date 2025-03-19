@@ -1,90 +1,144 @@
-# Scuric Dashboard
+# Scuric Privatinsolvenz Dashboard
 
-Ein interaktives Dashboard zur Verwaltung von Privatinsolvenz-Klienten, mit Integration zu ClickUp über Make.com.
+Ein robustes Dashboard zur Verwaltung von Privatinsolvenz-Mandanten mit nahtloser Integration zu ClickUp über Make.com.
 
-## Funktionen
+## Hauptfunktionen
 
-- Verwaltung von Klienten in verschiedenen Phasen (Erstberatung, Checkliste, Dokumente)
-- Integration mit ClickUp über Make.com
-- Getrennte Dashboards für Verkaufsteam und Sachbearbeitungsteam
-- Automatische Synchronisierung von Daten
+- Verwaltung von Mandanten in verschiedenen Phasen (Erstberatung, Checkliste, Dokumente)
+- Bidirektionale Synchronisierung mit ClickUp durch Make.com
+- Getrennte Ansichten für Verkaufsteam und Sachbearbeitungsteam
+- Automatische Datenaktualisierung und Statusverfolgung
+- Fehlertolerante Backend-Architektur für hohe Verfügbarkeit
 
-## Technologien
+## Technologie-Stack
 
-- **Frontend**: React, React Router, TailwindCSS
-- **Backend**: Node.js, Express, MongoDB
+- **Frontend**: React 18, React Router v6, TailwindCSS, Vite
+- **Backend**: Node.js, Express.js, MongoDB
 - **Integration**: Make.com, ClickUp API
 - **Deployment**: Backend auf Render.com, Frontend auf Vercel
 
-## Setup
+## Schnellstart
 
 ### Lokale Entwicklung
 
 1. Repository klonen:
-   ```
+   ```bash
    git clone https://github.com/Luka-Kanzlei-Scuric/Dashboard-Scuric.git
    cd Dashboard-Scuric
    ```
 
-2. Frontend starten:
+2. Umgebungsvariablen einrichten:
+   ```bash
+   # Kopieren der Beispieldatei
+   cp .env.example .env
+   # Anpassen der Werte in .env
    ```
+
+3. Frontend starten:
+   ```bash
    npm install
    npm run dev
    ```
 
-3. Backend starten:
-   ```
+4. Backend starten:
+   ```bash
    cd backend
    npm install
-   node server.js
+   npm run dev  # Verwendet nodemon für automatisches Neuladen
    ```
 
-### Umgebungsvariablen
+## Server-Setup (Produktionsumgebung)
 
-#### Backend (.env):
-```
-MONGODB_URI=deine_mongodb_verbindung
-CLICKUP_API_KEY=dein_clickup_api_key
-PORT=5001
-```
+### Voraussetzungen
 
-#### Frontend (.env.local):
-```
-VITE_API_URL=http://localhost:5001/api
-```
+- Node.js 16+ installiert
+- MongoDB-Instanz (Atlas oder selbst gehostet)
+- Make.com-Konto für ClickUp-Integration
 
-## Make.com Integration
+### Installation
 
-Die Integration mit ClickUp erfolgt über Make.com. 
-
-### Setup
-
-1. Kopiere die Beispiel-Umgebungsdatei:
-   ```
-   cp .env.make-example .env
+1. Klonen Sie das Repository auf Ihren Server:
+   ```bash
+   git clone https://github.com/Luka-Kanzlei-Scuric/Dashboard-Scuric.git
+   cd Dashboard-Scuric
    ```
 
-2. Bearbeite die `.env`-Datei und aktualisiere folgende Werte:
-   - `MAKE_WEBHOOK_URL`: Deine Make.com Webhook-URL
-   - `MONGODB_URI`: Deine MongoDB-Verbindungszeichenfolge
-   - `FRONTEND_URL`: URL deiner Frontend-Anwendung
-   - `PORT`: Der Port für den Backend-Server
+2. Backend-Abhängigkeiten installieren:
+   ```bash
+   cd backend
+   npm install --production
+   ```
 
-3. Make.com-Szenario einrichten:
-   - Erstelle ein neues Szenario in Make.com
-   - Füge ein ClickUp-Trigger-Modul hinzu (z.B. "Watch Tasks")
-   - Konfiguriere den Trigger, um neue oder aktualisierte Tasks zu beobachten
-   - Füge ein HTTP-Modul hinzu, um Daten an dein Backend zu senden:
-     - URL: `https://deine-backend-url/api/clickup/make-webhook`
-     - Methode: POST
-     - Body: Mappe die ClickUp-Task-Daten vom Trigger
+3. Umgebungsvariablen konfigurieren:
+   ```bash
+   cp .env.example .env
+   # Bearbeiten Sie die .env-Datei mit Ihren tatsächlichen Werten
+   ```
 
-Diese Integration sendet ClickUp-Aufgabendaten an den `/api/clickup/make-webhook` Endpunkt.
+4. Dauerhafte Prozessführung mit PM2 (empfohlen):
+   ```bash
+   npm install -g pm2
+   pm2 start server.js --name "privatinsolvenz-api"
+   pm2 save
+   pm2 startup
+   ```
 
-## Deployment
+### Verfügbare Webhooks
 
-- **Backend**: Hostet auf Render.com mit Node.js
-- **Frontend**: Hostet auf Vercel mit automatischem Deployment
+Das Backend bietet mehrere redundante Webhooks für Make.com-Integration:
+
+1. **Primärer Webhook**: `/api/clickup-data`
+   - Optimiert für Fehlertoleranz
+   - Erfordert nur minimale Felder: `id` und `name`
+
+2. **Alternativer Webhook**: `/api/make-webhook`
+   - Hochgradig vereinfacht für maximale Zuverlässigkeit
+   - Erfordert nur: `id` oder `taskId` und `name` oder `title`
+
+3. **Legacy-Webhook**: `/api/clickup/make-webhook`
+   - Für bestehende Integrationen
+
+### Make.com Konfiguration
+
+1. Erstellen Sie ein Szenario in Make.com
+2. Nutzen Sie das ClickUp-Modul als Trigger
+3. Konfigurieren Sie das HTTP-Modul zur Datenübertragung an Ihr Backend
+   ```
+   URL: https://ihre-backend-domain.com/api/clickup-data
+   Methode: POST
+   Körper (JSON): Die Task-Daten aus dem ClickUp-Trigger
+   ```
+
+4. Beispiel für Datenstruktur:
+   ```json
+   {
+     "id": "task-12345",
+     "name": "Max Mustermann",
+     "status": {
+       "status": "NEUE ANFRAGE"
+     },
+     "custom_fields": [
+       {
+         "name": "Email",
+         "value": "max@beispiel.de"
+       },
+       {
+         "name": "Telefonnummer",
+         "value": "0123456789"
+       }
+     ]
+   }
+   ```
+
+## Robustheit und Fehlertoleranz
+
+Das Backend wurde optimiert für:
+
+- **Automatische Wiederverbindung** zu MongoDB bei Verbindungsabbrüchen
+- **Graceful Shutdown** mit sauberer Ressourcenfreigabe
+- **Unbehandelte Fehlererkennung** ohne Serverabsturz
+- **Multiple redundante Webhook-Endpunkte** für Make.com-Integration
+- **Memory-Leak-Überwachung** für lange Laufzeiten
 
 ## Entwickelt von
 
@@ -92,4 +146,4 @@ Luka Scuric, Kanzlei Scuric
 
 ## Lizenz
 
-Alle Rechte vorbehalten
+© 2024 Scuric Privatinsolvenz - Alle Rechte vorbehalten
