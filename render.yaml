@@ -15,5 +15,5 @@ services:
       - key: CLICKUP_API_KEY
         value: pk_84132000_89QTDVSH9ZPGW3WFSS5K8604I2KGOHMO
       - key: CORS_ORIGIN
-        value: https://dashboard-scuric-5qwacs1xe-luka-kanzlei-scurics-projects.vercel.app
+        value: https://dashboard-scuric-git-main-luka-kanzlei-scurics-projects.vercel.app
     autoDeploy: true

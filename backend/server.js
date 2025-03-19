@@ -22,19 +22,18 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files from the public directory
 app.use(express.static('public'));
 
-// Configure CORS with the cors package
+// Simplified CORS configuration
+const allowedOrigins = [
+    'https://dashboard-scuric-git-main-luka-kanzlei-scurics-projects.vercel.app',
+    'https://dashboard-scuric.vercel.app',
+    'https://dashboard-scuric.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:4173'
+];
+
 app.use(cors({
     origin: function(origin, callback) {
-        const allowedOrigins = [
-            'https://formular-mitarbeiter.vercel.app',
-            'https://dashboard-scuric.vercel.app',
-            'https://dashboard-scuric.onrender.com',
-            'https://dashboard-scuric-5qwacs1xe-luka-kanzlei-scurics-projects.vercel.app',
-            'http://localhost:3000',
-            'http://localhost:5173',
-            'http://localhost:4173'
-        ];
-        
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -196,7 +195,7 @@ app.get('/api/logs', (req, res) => {
 
 // SUPER-VEREINFACHTE Webhook-Route für Make.com - Minimale Version für maximale Zuverlässigkeit
 app.post('/api/clickup-data', async (req, res) => {
-    console.log('Make.com Webhook empfangen - SUPER-VEREINFACHTE VERARBEITUNG');
+    console.log('Make.com Webhook empfangen');
     console.log('Rohdaten empfangen:', JSON.stringify(req.body, null, 2));
     
     try {
@@ -219,61 +218,20 @@ app.post('/api/clickup-data', async (req, res) => {
             }
         }
         
-        // MINIMALE Datenextraktion - nur ID und Name sind notwendig
-        // Alle Werte in String konvertieren um Typprobleme zu vermeiden
-        let taskId = String(taskData.id || taskData.taskId || taskData.task_id || `temp-${Date.now()}`);
-        let leadName = String(taskData.name || taskData.title || taskData.leadName || "Neuer Mandant");
+        // Extrahiere die wichtigsten Daten
+        const taskId = String(taskData.id || taskData.taskId || taskData.task_id || `temp-${Date.now()}`);
+        const leadName = String(taskData.name || taskData.title || taskData.leadName || "Neuer Mandant");
         
-        // Optional: Versuch, Status und Kontaktinformationen zu extrahieren
-        let status = "NEUE ANFRAGE";
-        let email = "";
-        let telefon = "";
-        
-        // Einfache Status-Extraktion
-        if (taskData.status) {
-            if (typeof taskData.status === 'string') {
-                status = taskData.status;
-            } else if (taskData.status.status) {
-                status = taskData.status.status;
-            }
-        }
-        
-        // Einfache Email-Extraktion
-        if (taskData.email) email = taskData.email;
-        
-        // Einfache Telefon-Extraktion
-        if (taskData.telefon) telefon = taskData.telefon;
-        if (taskData.phone) telefon = taskData.phone;
-        
-        // Extrahiere aus Custom Fields, falls vorhanden
-        if (Array.isArray(taskData.custom_fields)) {
-            taskData.custom_fields.forEach(field => {
-                if (field.name === "Email" && field.value) email = field.value;
-                if (field.name === "Telefonnummer" && field.value) telefon = field.value;
-            });
-        }
-        
-        // Prüfen, ob der Task bereits existiert
+        // Prüfe, ob der Task bereits existiert
         let form = await Form.findOne({ taskId });
-        let isNew = false;
         
         if (form) {
             console.log(`Task ${taskId} existiert bereits, aktualisiere`);
             form.leadName = leadName;
             form.updatedAt = new Date();
-            
-            // Status aktualisieren - direkter Zugriff statt verschachtelter Struktur
-            form.clickupData = form.clickupData || {};
-            form.clickupData.status = status;
-            
-            // Aktualisiere Kontaktinformationen, wenn vorhanden
-            if (email) form.email = email;
-            if (telefon) form.telefon = telefon;
-            
             await form.save();
         } else {
             console.log(`Erstelle neuen Task ${taskId}`);
-            isNew = true;
             
             // Erstelle ein neues Formular mit minimalen Daten
             form = new Form({
@@ -281,36 +239,31 @@ app.post('/api/clickup-data', async (req, res) => {
                 leadName: leadName,
                 phase: 'erstberatung',
                 qualifiziert: false,
-                email: email || '',
-                telefon: telefon || '',
                 createdAt: new Date(),
-                updatedAt: new Date(),
-                clickupData: {
-                    status: status
-                }
+                updatedAt: new Date()
             });
             
             await form.save();
         }
         
-        console.log(`Task ${isNew ? 'erstellt' : 'aktualisiert'}: ${leadName} (${taskId})`);
+        console.log(`Task ${form._id ? 'erstellt' : 'aktualisiert'}: ${leadName} (${taskId})`);
         
         // Erfolgreiche Antwort
         res.json({
             success: true,
-            message: `Task erfolgreich ${isNew ? 'erstellt' : 'aktualisiert'}`,
+            message: `Task erfolgreich ${form._id ? 'erstellt' : 'aktualisiert'}`,
             form: {
                 id: form.taskId,
                 name: form.leadName,
-                status: form.clickupData?.status || status
+                phase: form.phase
             }
         });
         
     } catch (error) {
         console.error('Fehler bei der Verarbeitung des Make.com Webhooks:', error);
         
-        // Einfache Fehlerantwort
-        res.status(200).json({  // Status 200 damit Make.com es als "erfolgreich" betrachtet
+        // Fehlerantwort
+        res.status(500).json({
             success: false,
             message: 'Fehler bei der Verarbeitung',
             error: error.message
