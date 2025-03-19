@@ -22,6 +22,30 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files from the public directory
 app.use(express.static('public'));
 
+// Configure CORS with the cors package
+app.use(cors({
+    origin: function(origin, callback) {
+        const allowedOrigins = [
+            'https://formular-mitarbeiter.vercel.app',
+            'https://dashboard-scuric.vercel.app',
+            'https://dashboard-scuric.onrender.com',
+            'https://dashboard-scuric-5qwacs1xe-luka-kanzlei-scurics-projects.vercel.app',
+            'http://localhost:3000',
+            'http://localhost:5173',
+            'http://localhost:4173'
+        ];
+        
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
+
 //Middleware - CORS aktivieren für alle Anfragen
 app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -29,6 +53,7 @@ app.use((req, res, next) => {
         'https://formular-mitarbeiter.vercel.app',
         'https://dashboard-scuric.vercel.app',
         'https://dashboard-scuric.onrender.com',
+        'https://dashboard-scuric-5qwacs1xe-luka-kanzlei-scurics-projects.vercel.app',
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:4173',
@@ -53,16 +78,44 @@ app.use((req, res, next) => {
     next();
 });
 
-// Connect to MongoDB
+// Datenbank-Verbindung mit Wiederversuchen
 (async () => {
     try {
-        const dbConnected = await connectDB();
+        const MAX_RETRY_COUNT = 5;
+        let retryCount = 0;
+        let dbConnected = false;
+        
+        while (!dbConnected && retryCount < MAX_RETRY_COUNT) {
+            try {
+                dbConnected = await connectDB();
+                
+                if (!dbConnected) {
+                    retryCount++;
+                    if (retryCount < MAX_RETRY_COUNT) {
+                        console.log(`⏳ Datenbankverbindung fehlgeschlagen. Wiederversuch ${retryCount}/${MAX_RETRY_COUNT} in 5 Sekunden...`);
+                        await new Promise(resolve => setTimeout(resolve, 5000)); // 5 Sekunden warten
+                    }
+                }
+            } catch (innerError) {
+                retryCount++;
+                console.error(`❌ Fehler beim Verbindungsversuch ${retryCount}:`, innerError.message);
+                
+                if (retryCount < MAX_RETRY_COUNT) {
+                    const waitTime = 5000 * retryCount; // Exponentielles Backoff
+                    console.log(`⏳ Warte ${waitTime/1000} Sekunden vor dem nächsten Versuch...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+        }
+        
         if (!dbConnected) {
-            console.warn('⚠️ Server läuft ohne Datenbankverbindung');
+            console.warn('⚠️ Server läuft ohne Datenbankverbindung nach mehreren Versuchen');
+            console.warn('⚠️ Der Server ist betriebsbereit, aber Daten können nicht gespeichert werden');
+            console.warn('⚠️ Die Make.com Integration wird trotzdem funktionieren, aber Daten könnten verloren gehen');
         }
     } catch (error) {
-        console.error('❌ Fehler beim Verbinden zur Datenbank:', error.message);
-        console.warn('⚠️ Server läuft ohne Datenbankverbindung');
+        console.error('❌ Kritischer Fehler beim Verbinden zur Datenbank:', error.message);
+        console.warn('⚠️ Server läuft ohne Datenbankverbindung - Bitte überprüfen Sie die Konfiguration');
     }
 })();
 
@@ -86,12 +139,27 @@ app.use(passport.session());
 // Configure Passport
 configurePassport();
 
-// Basic test route
+// Server-Status Route mit erweiterten Informationen
 app.get('/', (req, res) => {
-    res.json({ message: 'Privatinsolvenz API läuft' });
+    const uptime = process.uptime();
+    const uptimeFormatted = `${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`;
+    
+    res.json({ 
+        status: 'online',
+        message: 'Privatinsolvenz API läuft', 
+        version: '1.0.0',
+        uptime: uptimeFormatted,
+        serverTime: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
 });
 
-// Production ready - test routes removed
+// Einfache Health-Check Route für Server-Monitoring
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+// Production ready - test routes entfernt
 
 // Routes
 app.use('/api/forms', require('./routes/formRoutes'));
@@ -307,22 +375,88 @@ try {
     });
 }
 
-// Error Handler
+// Globale Fehlerbehandlung für unbehandelte Fehler und Abstürze verhindern
+process.on('uncaughtException', (error) => {
+    console.error('UNBEHANDELTE EXCEPTION - Server läuft weiter:', error);
+    // Optional: Sende Benachrichtigungen über kritische Fehler, z.B. per E-Mail
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNBEHANDELTE PROMISE REJECTION - Server läuft weiter:', reason);
+});
+
+// Erweiterter Error Handler mit besserem Logging
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    // Detailliertes Error-Logging
+    console.error(`SERVER-FEHLER [${new Date().toISOString()}]:`);
+    console.error(`- Route: ${req.method} ${req.originalUrl}`);
+    console.error(`- Fehler: ${err.message}`);
+    console.error(`- Stack: ${err.stack}`);
+    
+    // Client-IP für mögliche Fehleranalyse
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.error(`- Client: ${clientIP}`);
+    
+    // Sichere Fehlerantwort - keine internen Details in Produktion
     res.status(500).json({
+        success: false,
         message: 'Interner Server-Fehler',
-        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Auf dem Server ist ein Fehler aufgetreten',
+        requestId: Date.now().toString(36) + Math.random().toString(36).substring(2, 5)
     });
 });
 
-// Server starten
+// Server starten mit verbesserter Fehlerbehandlung und Informationen
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-    console.log(`Server läuft auf Port ${PORT}`);
-    console.log(`Verfügbare Routen:`);
-    console.log(`GET / - API Status`);
-    console.log(`GET /api/forms - Formulare abrufen`);
-    console.log(`GET /api/logs - Logs abrufen`);
-    console.log(`POST /api/clickup/make-webhook - Make.com Webhook-Endpunkt`);
+const server = app.listen(PORT, () => {
+    const serverEnv = process.env.NODE_ENV || 'development';
+    
+    console.log(`
+==============================================
+🚀 PRIVATINSOLVENZ API SERVER GESTARTET
+==============================================
+🌐 Server läuft auf Port: ${PORT}
+🔧 Umgebung: ${serverEnv.toUpperCase()}
+⏰ Startzeit: ${new Date().toISOString()}
+==============================================
+📋 HAUPTROUTEN:
+  > GET / - API Status & Health
+  > GET /health - Server Health Check
+  > GET /api/forms - Mandanten abrufen
+  > GET /api/logs - Logs abrufen
+==============================================
+🔌 WEBHOOK ENDPUNKTE:
+  > POST /api/clickup-data - Primärer Make.com Webhook
+  > POST /api/make-webhook - Alternativer Make.com Webhook
+  > POST /api/clickup/make-webhook - Legacy Webhook
+==============================================
+📢 Server bereit für Anfragen!
+`);
+
+    // Überwache Server-Ressourcennutzung
+    setInterval(() => {
+        const memoryUsage = process.memoryUsage();
+        const memoryUsageMB = Math.round(memoryUsage.heapUsed / 1024 / 1024 * 100) / 100;
+        if (memoryUsageMB > 200) { // Warnung bei mehr als 200MB
+            console.warn(`WARNUNG: Hohe Speichernutzung: ${memoryUsageMB} MB`);
+        }
+    }, 300000); // Alle 5 Minuten prüfen
 });
+
+// Ordentliches Herunterfahren ermöglichen
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+function gracefulShutdown() {
+    console.log('\nServer wird ordnungsgemäß heruntergefahren...');
+    server.close(() => {
+        console.log('Server-Verbindungen geschlossen.');
+        process.exit(0);
+    });
+    
+    // Falls der Server innerhalb von 10 Sekunden nicht sauber heruntergefahren wird, hart beenden
+    setTimeout(() => {
+        console.error('Konnte nicht ordnungsgemäß herunterfahren, erzwinge Beendigung');
+        process.exit(1);
+    }, 10000);
+}
