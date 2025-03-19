@@ -125,16 +125,80 @@ app.post('/api/clickup-data', async (req, res) => {
         
         // In Logs eintragen
         if (typeof addLog === 'function') {
-            addLog('info', 'Make.com Webhook empfangen', req.body, 'Make Integration');
+            addLog('info', 'Make.com Webhook empfangen', {
+                endpoint: '/api/clickup-data',
+                timestamp: new Date().toISOString(),
+                headers: req.headers['content-type'],
+                body: req.body
+            }, 'Make Integration');
         }
         
-        // An den ClickUp-Controller weiterleiten
-        const clickupController = require('./controllers/clickupController');
-        
-        // Request und Response an den Make-Webhook-Handler weiterleiten
-        await clickupController.handleMakeWebhook(req, res);
+        // Anfrage formatieren, wenn es ein Array ist
+        if (Array.isArray(req.body) && req.body.length > 0) {
+            addLog('info', 'Array von Tasks empfangen, verarbeite sequentiell', {
+                count: req.body.length
+            }, 'Make Integration');
+            
+            // An den ClickUp-Controller weiterleiten
+            const clickupController = require('./controllers/clickupController');
+            const results = [];
+            
+            // Verarbeite jede Task einzeln
+            for (const task of req.body) {
+                try {
+                    // Erstelle ein temporäres Response-Objekt
+                    const tempRes = {
+                        status: (code) => ({ json: (data) => ({ code, data }) }),
+                        json: (data) => data
+                    };
+                    
+                    // Verarbeite die Anfrage mit einer einzelnen Task
+                    const tempReq = { ...req, body: task };
+                    const result = await clickupController.handleMakeWebhook(tempReq, tempRes);
+                    results.push(result);
+                } catch (taskError) {
+                    addLog('error', `Fehler bei der Verarbeitung von Task ${task.id || 'unbekannt'}`, {
+                        error: taskError.message
+                    }, 'Make Integration');
+                    
+                    results.push({
+                        success: false,
+                        message: `Fehler bei Task ${task.id || 'unbekannt'}`,
+                        error: taskError.message
+                    });
+                }
+            }
+            
+            // Sende eine zusammengefasste Antwort
+            return res.json({
+                success: true,
+                message: `${results.length} Tasks verarbeitet`,
+                results: results
+            });
+        } else {
+            // An den ClickUp-Controller weiterleiten
+            const clickupController = require('./controllers/clickupController');
+            
+            // Request und Response an den Make-Webhook-Handler weiterleiten
+            await clickupController.handleMakeWebhook(req, res);
+        }
     } catch (error) {
         console.error('Fehler im Make.com Webhook Endpoint:', error);
+        
+        // Versuche, den Fehler zu loggen
+        try {
+            const makeRoutes = require('./routes/makeRoutes');
+            if (typeof makeRoutes.addLog === 'function') {
+                makeRoutes.addLog('error', 'Fehler bei der Verarbeitung eines Make.com-Webhooks', {
+                    error: error.message,
+                    stack: error.stack,
+                    timestamp: new Date().toISOString()
+                }, 'Make Integration');
+            }
+        } catch (logError) {
+            console.error('Konnte Fehler nicht loggen:', logError);
+        }
+        
         res.status(500).json({
             success: false,
             message: 'Fehler bei der Verarbeitung des Webhooks',
